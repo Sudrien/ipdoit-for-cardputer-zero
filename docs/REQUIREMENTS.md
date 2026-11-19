@@ -20,7 +20,7 @@ Keyboard-driven (46-key matrix).
 
 ### 3. Add rules, two ways
 - **Form** (default): action (allow / deny / reject / limit), direction (in / out),
-  port or range, protocol (tcp / udp / any), source (any, this network, or a typed IP
+  port or range, protocol (tcp / udp / any), source (any, My network, or a typed IP
   or CIDR), optional comment.
 - **Presets**: SSH (22/tcp, limit), HTTP (80/tcp), HTTPS (443/tcp), DNS (53),
   mDNS (5353/udp). A preset fills the form so it can be adjusted before applying.
@@ -46,20 +46,38 @@ Keyboard-driven (46-key matrix).
   allowed on one and blocked on the other.
 - Refreshed when the page opens and after every rule change.
 
-### 5. Current subnet
-- Work out the network(s) the device is on, without root, from `ip -o addr show` and
-  `ip route`: for each interface that is up (Wi-Fi, USB, Ethernet), its IPv4 subnet in
-  CIDR form (for example `192.168.1.0/24`) and its global IPv6 prefix.
-- Skip loopback, link-local (`169.254.0.0/16`, `fe80::/10`) and down interfaces.
-- Used in three places:
-  - the add-rule form offers **This network (192.168.1.0/24, wlan0)** as a source,
-    next to "any" and a typed IP/CIDR;
-  - presets can be applied "from this network only", for example SSH from the LAN;
-  - the listening-ports page labels a partial verdict **LAN only** when the allowed
-    source is the current subnet.
-- Re-read whenever the add-rule form or ports page opens, because the device moves
-  between networks. A rule stores the subnet as it was when added; if the network
-  changes later, the rule does not follow it.
+### 5. My network (follows the device, with trusted networks)
+- **Current subnet**: worked out without root from `ip -o addr show` and `ip route`.
+  For each interface that is up, its IPv4 subnet in CIDR form (for example
+  `192.168.1.0/24`) and its global IPv6 prefix. Loopback, link-local
+  (`169.254.0.0/16`, `fe80::/10`) and down interfaces are skipped.
+- **Network identity**: each network is identified by its default gateway's MAC address
+  (from `ip route` plus `ip neigh`), together with its subnet. A link with no gateway,
+  such as a direct USB connection, is identified by interface name and subnet.
+- **Trust**: each network can be marked **trusted** or **untrusted**. A network seen
+  for the first time is untrusted until marked. When Ipdoit opens on an unmarked
+  network it asks "Trust this network?" and shows its subnet and gateway. Marks are kept
+  in `/etc/ipdoit/networks.conf` (root-owned) and can be changed from a Networks page.
+- **"My network" as a rule source**, with two choices per rule:
+  - **My network, trusted only** (default): the rule exists only while the device is on
+    a trusted network, with that network's subnet as the source. On an untrusted network
+    it is removed, so nothing extra is open on, say, public Wi-Fi.
+  - **My network, any network**: the rule follows the current subnet everywhere,
+    trusted or not.
+- **Following the device**: "My network" rules are kept as templates in
+  `/etc/ipdoit/mynet-rules.conf` (action, port, protocol, scope). The ufw rules made from
+  them carry a comment tag (`ipdoit:mynet:<id>`), so they can be found and replaced.
+  A NetworkManager dispatcher script (`/etc/NetworkManager/dispatcher.d/90-ipdoit`),
+  run as root by NetworkManager whenever a connection comes up, goes down or gets a new
+  address, deletes the tagged rules and re-adds them for the current subnet(s) and trust
+  state. Ipdoit does the same when it opens, in case an event was missed.
+- These automatic rewrites are not undoable changes; undo covers rule changes made in
+  the app.
+- The add-rule form offers sources: any, **My network (trusted only)**,
+  **My network (any network)**, or a typed IP/CIDR. Presets can use either My network
+  option, for example SSH from My network (trusted only).
+- On the listening-ports page, a port allowed only from My network shows
+  **LAN only (trusted)** or **LAN only**.
 
 ### 6. Root access
 - sudo password asked on launch (the launcher starts apps as a normal user), passed to
@@ -85,8 +103,11 @@ Keyboard-driven (46-key matrix).
 
 ### 8. Packaging
 - Depends on `ufw` and `sudo`.
-- No background service. (The store rejects packages whose bundled systemd service runs
-  as root, and Ipdoit does not need one.)
+- No systemd service. (The store rejects packages whose bundled systemd service runs
+  as root.) The NetworkManager dispatcher script is a root hook, not a service; it must
+  be root-owned and mode 0755 or NetworkManager ignores it.
+- Removing the package deletes the tagged My network rules, the dispatcher script and
+  `/etc/ipdoit` (on purge).
 
 ## Planned (not in v0.1.0)
 
@@ -111,6 +132,12 @@ Keyboard-driven (46-key matrix).
   support ufw needs (iptables-nft)? Must be checked on hardware.
 - Is sshd enabled by default on the device (SSH over Wi-Fi or USB)? This decides how
   often the lockout guard matters.
+- Does the device image use NetworkManager? If not (for example plain dhcpcd), the
+  dispatcher needs a dhcpcd hook instead.
+- A gateway MAC can be copied by another router, so trust by MAC is a convenience, not
+  strong security. The Networks page should say so.
+- Does the store's "no root service" check treat a NetworkManager dispatcher script as
+  acceptable?
 - The blocked/allowed verdict follows ufw's user rules; rules added outside ufw
   (`/etc/ufw/before.rules`, raw iptables/nftables) are not evaluated. The page should
   say so.
