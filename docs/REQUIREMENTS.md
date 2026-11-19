@@ -112,6 +112,35 @@ Keyboard-driven (46-key matrix).
 - Removing the package deletes the tagged My network rules, the dispatcher script and
   `/etc/ipdoit` (on purge).
 
+## Design decisions
+
+1. **Deleting a My network rule**: the rules list shows each My network rule as one
+   entry (its template), not the live ufw rules made from it. Deleting it removes the
+   template and every live ufw rule tagged with its id. Deleting only the ufw rule would
+   make the next sync bring it back.
+2. **Undo and My network**: backups also include `/etc/ipdoit/mynet-rules.conf`. Undo
+   restores it with the rules files, then re-syncs My network for the current network,
+   so rules for a previous network are not brought back. Whitelist changes are not
+   undoable changes.
+3. **One change at a time**: ufw has no locking of its own. The app and the dispatcher
+   both take `/run/ipdoit.lock` (flock) before changing anything.
+4. **Free-form is limited to rule commands**: only `allow`, `deny`, `reject` and
+   `limit`, optionally after `insert N`. Commands such as `reset`, `disable`,
+   `default`, `delete`, `logging` and `route` are refused. Input is split into
+   arguments and never passed through a shell.
+5. **Pages**: Status (on/off, default policies, Whitelist this network, Undo), Rules
+   (list, delete, add), Ports, Networks. Left/Right switch pages; the add-rule form
+   opens from Rules. On-screen name: "Ipdoit".
+6. **Code**: Updoit's process runner and sudo handling are copied into this repo, not
+   shared as a library.
+7. **Root helper**: every privileged step goes through one program,
+   `/usr/libexec/ipdoit/ipdoit-helper`, run with sudo by the app and directly by the
+   dispatcher. It takes the lock, makes the backup, runs ufw, and syncs My network.
+   Reading the firewall state is one helper call that prints ufw status, the rules
+   (from the tuples in `/etc/ufw/user.rules` and `user6.rules`, which are root-only),
+   and the listening sockets. User deletes find the rule's current number by matching
+   its tuple inside the lock, so a number that shifted in the meantime is never deleted.
+
 ## Planned (not in v0.1.0)
 
 - Logging level (`ufw logging off|low|medium|high`) and a viewer for recent
@@ -139,8 +168,10 @@ Keyboard-driven (46-key matrix).
   dispatcher needs a dhcpcd hook instead.
 - A gateway MAC can be copied by another router, so whitelisting by MAC is a convenience,
   not strong security. The Networks page should say so.
-- Does the store's "no root service" check treat a NetworkManager dispatcher script as
-  acceptable?
+- Store check: AppBuilder's `czdev publish` only rejects systemd `.service` units under
+  `lib/systemd/system/`, `usr/lib/systemd/system/` or `etc/systemd/system/` that would
+  run as root (`find_root_services` in `scripts/czdev/publish.py`). The dispatcher script
+  is not a service unit, so it passes that check.
 - The blocked/allowed verdict follows ufw's user rules; rules added outside ufw
   (`/etc/ufw/before.rules`, raw iptables/nftables) are not evaluated. The page should
   say so.
