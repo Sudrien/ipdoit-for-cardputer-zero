@@ -45,10 +45,11 @@ Keyboard-driven (46-key matrix).
   - deleting the last rule that allows or limits the SSH port;
   - adding a deny or reject rule that covers the SSH port.
   If sshd is not running, no warning is shown.
-- **Undo last change**: before each change, back up `/etc/ufw/user.rules`,
-  `/etc/ufw/user6.rules` and the enabled state into `/var/lib/ipdoit/backups/`
-  (last 10 kept). Undo restores the most recent backup and runs `ufw reload`
-  (and enable/disable to match).
+- **Undo last change**: before each rule change, back up `/etc/ufw/user.rules` and
+  `/etc/ufw/user6.rules` into `/var/lib/ipdoit/backups/` (last 10 kept). Undo restores
+  the most recent backup and runs `ufw reload`. Undo covers rules only: it never turns
+  the firewall on or off, and enabling or disabling is not recorded as an undoable
+  change.
 
 ### 6. Packaging
 - Depends on `ufw` and `sudo`.
@@ -77,4 +78,3 @@ Keyboard-driven (46-key matrix).
   support ufw needs (iptables-nft)? Must be checked on hardware.
 - Is sshd enabled by default on the device (SSH over Wi-Fi or USB)? This decides how
   often the lockout guard matters.
-- Should undo also cover enable/disable on its own, or only rule changes?
