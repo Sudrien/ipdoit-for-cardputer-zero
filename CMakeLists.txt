@@ -429,6 +429,45 @@ target_link_libraries(${PROJECT_NAME}_platform
 )
 
 # ====================================================
+# Firewall sources
+# - ufw parsing, port verdicts, My network sync, root helper client
+# - plain C++17 + POSIX, no LVGL, so it can be tested on its own
+# ====================================================
+find_package(Threads REQUIRED)
+
+file(GLOB_RECURSE FW_SOURCES CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/fw/*.cpp"
+)
+list(REMOVE_ITEM FW_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/fw/helper_main.cpp")
+
+add_library(${PROJECT_NAME}_fw
+    STATIC
+    ${FW_SOURCES}
+)
+
+target_include_directories(${PROJECT_NAME}_fw
+    PUBLIC
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/fw"
+)
+
+target_link_libraries(${PROJECT_NAME}_fw
+    PUBLIC
+        Threads::Threads
+)
+
+# Root helper: every privileged step (run via sudo by the app, or by the dispatcher).
+add_executable(ipdoit-helper src/fw/helper_main.cpp)
+target_link_libraries(ipdoit-helper PRIVATE ${PROJECT_NAME}_fw)
+
+option(IPDOIT_BUILD_TESTS "Build firewall parser/logic tests" ON)
+if(IPDOIT_BUILD_TESTS)
+    enable_testing()
+    add_executable(fw_tests tests/fw_tests.cpp)
+    target_link_libraries(fw_tests PRIVATE ${PROJECT_NAME}_fw)
+    add_test(NAME fw_tests COMMAND fw_tests)
+endif()
+
+# ====================================================
 # Model sources
 # ====================================================
 file(GLOB_RECURSE MODEL_SOURCES CONFIGURE_DEPENDS
