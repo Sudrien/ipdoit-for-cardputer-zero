@@ -12,8 +12,10 @@ set(APP_DEBIAN_ARCHITECTURE "arm64" CACHE STRING "Debian package architecture")
 # Deliberately a placeholder: the store rejects packages whose Maintainer is
 # still a template/M5Stack identity, so set your own name and email here.
 set(APP_MAINTAINER "TODO Your Name <todo@example.invalid>" CACHE STRING "Debian package maintainer")
-set(APP_PACKAGE_DESCRIPTION "CardputerZero LVGL template application" CACHE STRING "Debian package summary")
-set(APP_INSTALL_SYSTEMD_SERVICE ON CACHE BOOL "Install a systemd service file for embedded deployments")
+set(APP_PACKAGE_DESCRIPTION "UFW firewall manager for CardputerZero" CACHE STRING "Debian package summary")
+# Off: the launcher starts Ipdoit from its .desktop entry, and the store rejects packages
+# whose bundled systemd service runs as root.
+set(APP_INSTALL_SYSTEMD_SERVICE OFF CACHE BOOL "Install a systemd service file for embedded deployments" FORCE)
 
 set(APP_GENERATED_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated/package")
 configure_file(
@@ -32,6 +34,17 @@ endif()
 
 install(TARGETS ${PROJECT_NAME}
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+)
+
+# Root helper: every privileged step, run with sudo by the app or by the dispatcher hook.
+install(TARGETS ipdoit-helper
+    RUNTIME DESTINATION "${CMAKE_INSTALL_LIBEXECDIR}/ipdoit"
+)
+
+# NetworkManager dispatcher hook: re-syncs My network rules when the network changes.
+# Not a systemd service; NetworkManager runs it as root and needs it root-owned, 0755.
+install(PROGRAMS "${CMAKE_CURRENT_SOURCE_DIR}/packaging/NetworkManager/90-ipdoit"
+    DESTINATION "/etc/NetworkManager/dispatcher.d"
 )
 
 install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/config/template-app.conf"
@@ -94,7 +107,7 @@ set(CPACK_DEBIAN_PACKAGE_ARCHITECTURE "${APP_DEBIAN_ARCHITECTURE}")
 set(CPACK_DEBIAN_PACKAGE_MAINTAINER "${APP_MAINTAINER}")
 set(CPACK_DEBIAN_PACKAGE_SECTION "utils")
 set(CPACK_DEBIAN_PACKAGE_PRIORITY "optional")
-set(APP_DEBIAN_DEPENDS "libc6, libstdc++6, libgcc-s1, libfreetype6, libpng16-16, libjpeg62-turbo, zlib1g")
+set(APP_DEBIAN_DEPENDS "libc6, libstdc++6, libgcc-s1, libfreetype6, libpng16-16, libjpeg62-turbo, zlib1g, ufw, sudo, iproute2")
 if(FMT_INCLUDE_DIR AND FMT_LIBRARY)
     string(APPEND APP_DEBIAN_DEPENDS ", libfmt10")
 endif()
@@ -107,6 +120,11 @@ configure_file(
     "${APP_GENERATED_DIR}/conffiles"
     @ONLY
 )
-set(CPACK_DEBIAN_PACKAGE_CONTROL_EXTRA "${APP_GENERATED_DIR}/conffiles")
+set(CPACK_DEBIAN_PACKAGE_CONTROL_EXTRA
+    "${APP_GENERATED_DIR}/conffiles"
+    "${CMAKE_CURRENT_SOURCE_DIR}/packaging/debian/postinst"
+    "${CMAKE_CURRENT_SOURCE_DIR}/packaging/debian/prerm"
+    "${CMAKE_CURRENT_SOURCE_DIR}/packaging/debian/postrm"
+)
 
 include(CPack)

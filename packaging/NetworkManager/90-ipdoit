@@ -1,0 +1,19 @@
+#!/bin/sh
+# SPDX-License-Identifier: MIT
+#
+# NetworkManager dispatcher hook for Ipdoit: when a connection comes up, goes down or
+# gets a new address, rewrite the "My network" firewall rules for the current network
+# and whitelist. Runs as root (NetworkManager requires this file to be root-owned, 0755).
+#
+#   $1 = interface, $2 = action
+
+case "$2" in
+    up | down | dhcp4-change | dhcp6-change | connectivity-change | vpn-up | vpn-down) ;;
+    *) exit 0 ;;
+esac
+
+helper=/usr/libexec/ipdoit/ipdoit-helper
+[ -x "$helper" ] || exit 0
+
+"$helper" sync 2>&1 | logger -t ipdoit || true
+exit 0

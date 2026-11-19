@@ -1,0 +1,10 @@
+#!/bin/sh
+set -e
+if [ "$1" = "configure" ]; then
+    mkdir -p /etc/ipdoit /var/lib/ipdoit/backups
+    chmod 755 /etc/ipdoit
+    chmod 700 /var/lib/ipdoit
+    # Bring My network rules in line with the current network (no-op on first install).
+    /usr/libexec/ipdoit/ipdoit-helper sync >/dev/null 2>&1 || true
+fi
+exit 0

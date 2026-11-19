@@ -1,0 +1,8 @@
+#!/bin/sh
+set -e
+# On removal, take the live My network rules out of ufw. The templates in /etc/ipdoit stay
+# until purge, so reinstalling brings them back.
+if [ "$1" = "remove" ] && [ -x /usr/libexec/ipdoit/ipdoit-helper ]; then
+    /usr/libexec/ipdoit/ipdoit-helper clear-mynet >/dev/null 2>&1 || true
+fi
+exit 0
