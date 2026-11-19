@@ -1,101 +1,104 @@
 <p align="center">
-  <picture>
-    <source
-      media="(prefers-color-scheme: dark)"
-      srcset="./screenshot/app-simulator-dark-darwin.png"
-    />
-    <source
-      media="(prefers-color-scheme: light)"
-      srcset="./screenshot/app-simulator-light-darwin.png"
-    />
-  <img
-    src="./screenshot/app-simulator-light-darwin.png"
-    alt="CardputerZero Template running in the desktop simulator"
-    width="315"
-  />
-  </picture>
+  <img src="./screenshot/ipdoit-status.png" alt="Ipdoit status page" width="320" />
+  <img src="./screenshot/ipdoit-ports.png" alt="Ipdoit listening ports with firewall verdicts" width="320" />
 </p>
 
 <div align="center">
-    <h1>CardputerZero Application Template</h1>
+    <h1>Ipdoit for CardputerZero</h1>
+    <p>Manage the UFW firewall from the CardputerZero launcher.</p>
 </div>
 
-<div align="center">
-  <p>A simple starter template for building embedded Linux GUI applications with LVGL and CMake.</p>
-</div>
+## What it does
 
-<p align="center" style="margin: 20px 0; display: flex; justify-content: center; flex-wrap: wrap; gap: 12px;">
-  <img src="https://img.shields.io/badge/SDL3-173B73?style=flat-square&logo=sdl&logoColor=white" alt="SDL3" />
-  <img src="https://img.shields.io/badge/CMake-064F8C?style=flat-square&logo=cmake&logoColor=white" alt="CMake" />
-  <img src="https://img.shields.io/badge/LVGL-2A9FD6?style=flat-square&logo=lvgl&logoColor=white" alt="LVGL" />
-  <img src="https://img.shields.io/badge/Raspberry%20Pi-A22846?style=flat-square&logo=raspberrypi&logoColor=white" alt="Raspberry Pi" />
-</p>
+- **Status**: firewall on/off, default policies, the current network and whether it is
+  whitelisted.
+- **Rules**: the ufw rule list in match order; delete the selected rule; add rules with a
+  form (presets for SSH, HTTP, HTTPS, DNS, mDNS) or by typing ufw syntax. Every new rule is
+  checked with `ufw --dry-run` before it is applied.
+- **Ports**: what is listening (`ss -tulpn`) and whether UFW lets it in: Allowed, Limited,
+  LAN only, Partial, Blocked, Local only, or Firewall off; IPv4 and IPv6 separately.
+- **My network** rules follow the device: they use the current subnet, and are rewritten
+  when the network changes. Each is either *whitelisted only* (active only on networks you
+  whitelisted, identified by gateway MAC) or *any network*.
+- **Safety**: every change is shown before it is applied; an SSH lockout guard warns
+  (Enter twice to override) when a change would block sshd; Undo restores the rules from
+  before the last change (it never turns the firewall on or off).
+- **sudo password** asked on launch, kept in memory only.
 
-<p align="center">
-  <a href="https://discord.gg/ysQAWBUE9Q">
-    <img
-      src="https://img.shields.io/badge/Discord-Join%20Community-5865F2?style=flat-square&logo=discord&logoColor=white"
-      alt="Join Discord"
-    />
-  </a>
-</p>
-It is intended to be used as a clean development baseline: desktop builds use an SDL hardware-accelerated compositor for fast UI preview, while device builds use the Linux/LVGL platform drivers.
+See [docs/REQUIREMENTS.md](docs/REQUIREMENTS.md) for scope, design decisions and planned
+features.
 
-## Project Overview
+## Keys
 
-In this example project, we used small MVVM-style structure around LVGL:
+| Page | Keys |
+| --- | --- |
+| all main pages | `Left`/`Right` switch pages, `R` refresh, `Esc` quit |
+| Status | `E` firewall on/off, `W` whitelist this network, `U` undo |
+| Rules | `Up`/`Down` select, `A`/`Enter` add with form, `F` type a rule, `D`/`Del` delete |
+| Ports | `Up`/`Down` scroll |
+| Networks | `Up`/`Down` select, `Enter` toggle current network, `D` remove from whitelist |
+| Add rule | `Up`/`Down` field, `Left`/`Right` change choice, `1`-`5` preset, `Enter` check |
+| Confirm | `Enter` apply (twice when there is a warning), `Esc` cancel |
 
-- **UI layer**: screens and widgets are implemented with LVGL objects. `BaseScreen` owns the page root, title bar, nav bar, and page content. Widgets derive from `BaseWidgets` and expose a `build()` entry point.
-- **Data model**: `BaseModel` stores application state such as current page and theme mode.
-- **View model**: `BaseViewModel` exposes model state as LVGL observer subjects and provides UI actions such as page switching, counter updates, theme toggle, and quit request.
-- **Reactive/data binding**: `src/reactive` wraps LVGL observer subjects and common bindings so labels, styles, flags, widget values, and events can be connected to application state.
-- **Data flow**: user input triggers widget callbacks, callbacks update `BaseViewModel`, view model publishes subjects, and bound UI objects refresh automatically through LVGL observers.
-- **Platform layer**: platform code owns Linux input integration and other hardware-facing services. The nav bar maps hardware/keyboard keys `4` to `8`, plus `ESC` for quit.
+`Fn`+`H` shows help for the current page. Hold `Esc` to quit.
 
-Current demo UI:
+## How it works
 
-- Page 1: Hello World, font weight toggle, LVGL version info, light/dark theme toggle, page navigation.
-- Page 2: Counter page, increment/decrement actions, simple page navigation.
+- The app runs as your user. Every privileged step goes through one root helper,
+  `/usr/libexec/ipdoit/ipdoit-helper`, run with `sudo`. It takes `/run/ipdoit.lock`, backs
+  up the rules, runs ufw, and re-syncs My network rules.
+- The firewall state is read in one helper call: `ufw status verbose`, the rule tuples from
+  `/etc/ufw/user.rules` and `user6.rules`, `ss -tulpn`, and `ip addr/route/neigh`.
+- Deleting finds the rule's current number by its tuple inside the lock, so a rule number
+  that shifted in the meantime is never deleted.
+- My network rules are kept as templates in `/etc/ipdoit/mynet-rules.conf`; the live ufw
+  rules carry an `ipdoit:mynet:<id>` comment. A NetworkManager dispatcher hook
+  (`/etc/NetworkManager/dispatcher.d/90-ipdoit`) re-syncs them when a connection changes,
+  and the app does too when it opens. If the gateway's MAC is not known yet (just
+  connected), existing whitelisted-only rules for that network are kept until it is.
+- Undo backups (last 10) are in `/var/lib/ipdoit/backups/`.
+- Port verdicts follow ufw's own rules only; rules added outside ufw (`before.rules`, raw
+  iptables/nftables) are not evaluated.
 
-## Repository Layout
+## Helper commands
 
-```text
-.
-├── assets/                 # Runtime assets used by the app
-│   ├── applications/       # Desktop/app launcher metadata
-│   ├── audio/              # Audio resources
-│   ├── fonts/              # TTF fonts loaded through FreeType
-│   └── images/             # Image resources
-├── screenshot/             # Simulator screenshots for supported desktop platforms
-├── src/
-│   ├── app/                # Application lifecycle, asset loading, screen management
-│   ├── config/             # LVGL config headers for desktop and device builds
-│   ├── logger/             # Project logging wrapper
-│   ├── model/              # Base application data model
-│   ├── platform/           # Platform input/hardware integration
-│   ├── reactive/           # LVGL observer subjects and binding helpers
-│   ├── view/               # Theme, UI constants, screens, and widgets
-│   │   ├── screens/        # Page-level LVGL screens
-│   │   └── widgets/        # Reusable LVGL widgets such as nav bar and icon button
-│   ├── viewmodel/          # BaseViewModel and UI-facing actions/state subjects
-│   └── main.cpp            # Program entry point
-├── CMakeLists.txt          # Build graph, dependencies, options, targets
-├── CMakePresets.json       # Desktop/device configure and build presets
-└── README.md
+For use over SSH (as root):
+
+```shell
+ipdoit-helper state
+ipdoit-helper dry-run allow from 192.168.1.0/24 to any port 22 proto tcp
+ipdoit-helper add limit 22/tcp
+ipdoit-helper mynet-add allow tcp 8080 whitelisted dev server
+ipdoit-helper whitelist-add gw:aa:bb:cc:dd:ee:ff 192.168.1.0/24 Home
+ipdoit-helper sync
+ipdoit-helper undo
 ```
 
-### Modules
+## Installed files
 
-- `src/app/asset_manager.*`: resolves runtime assets from the optional CMake asset root, source tree `assets/`, and installed `/usr/share/<APP_NAME>/` path.
-- `src/app/screen_namager.cpp`: switches LVGL screens when the current page subject changes.
-- `src/app/desktop_simulator_frame.*`: owns the desktop SDL window, renderer, high-resolution shell textures, input, and LVGL texture composition.
-- `src/config/lv_conf_desktop.h`: desktop LVGL rendering settings.
-- `src/config/lv_conf_cm0.h`: embedded Linux/CardputerZero LVGL settings.
-- `src/platform/linux_input.*`: Linux evdev keypad support and desktop SDL keyboard routing for nav buttons.
-- `src/reactive/subjects.*`: typed wrappers around LVGL subjects.
-- `src/reactive/bindings.*`: helper bindings for labels, theme, widget values, flags, states, and events.
-- `src/view/widgets/navbar.*`: bottom navigation bar and icon-button action mapping.
-- `src/view/widgets/icon_button.*`: transparent icon button with font/color/theme support.
+| Path | Purpose |
+| --- | --- |
+| `/usr/bin/ipdoit-for-cardputer-zero` | the app (started by the launcher) |
+| `/usr/libexec/ipdoit/ipdoit-helper` | root helper |
+| `/etc/NetworkManager/dispatcher.d/90-ipdoit` | re-syncs My network rules on network changes |
+| `/etc/ipdoit/whitelist.conf`, `mynet-rules.conf` | whitelist and My network templates |
+| `/var/lib/ipdoit/backups/` | undo backups |
+
+Depends on `ufw`, `sudo` and `iproute2`. There is no systemd service. Removing the package
+takes the live My network rules out of ufw; purging also deletes `/etc/ipdoit` and the
+backups.
+
+## Status
+
+Tested on an Ubuntu 24.04 amd64 host with a live ufw (IPv4; the sandbox had no IPv6) and a
+real sshd, in the desktop simulator as a sudo user: password, all four pages, add by form
+and by typing, delete, SSH guard and override, undo, whitelist on/off, firewall on/off,
+My network sync on network change, and install/remove/purge of the package. The package
+passes AppBuilder's root-service check.
+
+**Not yet tested on CardputerZero hardware.** Things to check there: that the image ships
+ufw with working netfilter, that it uses NetworkManager, the device keyboard for passwords
+and typed rules, and IPv6.
 
 ## Build Options
 
@@ -407,27 +410,6 @@ sudo apt install --no-install-recommends ./Ipdoit For Cardputer Zero_0.2.1_rev1_
 
 
 ## Development Guide
-
-### Navigation Keys
-
-The first page bottom nav bar maps hardware/keyboard keys from left to right:
-
-| Key | Nav item |
-| --- | --- |
-| `4` | First icon button |
-| `5` | Second icon button |
-| `6` | Third icon button |
-| `7` | Fourth icon button |
-| `8` | Fifth icon button |
-| `ESC` | First icon button / quit |
-
-The counter page uses direct keyboard shortcuts:
-
-| Key | Action |
-| --- | --- |
-| `ESC` | Return to the first page |
-| `Left` | Decrease the counter |
-| `Right` | Increase the counter |
 
 ### Adding a Screen
 
