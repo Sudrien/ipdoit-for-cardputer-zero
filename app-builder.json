@@ -14,7 +14,7 @@
       "screenshot/ipdoit-ports.png",
       "screenshot/ipdoit-form.png"
     ],
-    "icon": "assets/images/ipdoit-for-cardputer-zero.png",
+    "icon": "assets/images/ipdoit-store-icon.png",
     "license": "TODO: an SPDX id, e.g. MIT",
     "source_repo": "https://github.com/Sudrien/ipdoit-for-cardputer-zero",
     "author": { "github": "Sudrien", "display_name": "TODO: Your Name" },
