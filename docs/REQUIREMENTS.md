@@ -20,8 +20,8 @@ Keyboard-driven (46-key matrix).
 
 ### 3. Add rules, two ways
 - **Form** (default): action (allow / deny / reject / limit), direction (in / out),
-  port or range, protocol (tcp / udp / any), source (any, IP, or CIDR), optional
-  comment.
+  port or range, protocol (tcp / udp / any), source (any, this network, or a typed IP
+  or CIDR), optional comment.
 - **Presets**: SSH (22/tcp, limit), HTTP (80/tcp), HTTPS (443/tcp), DNS (53),
   mDNS (5353/udp). A preset fills the form so it can be adjusted before applying.
 - **Free-form**: type what follows `ufw`, for example
@@ -46,12 +46,27 @@ Keyboard-driven (46-key matrix).
   allowed on one and blocked on the other.
 - Refreshed when the page opens and after every rule change.
 
-### 5. Root access
+### 5. Current subnet
+- Work out the network(s) the device is on, without root, from `ip -o addr show` and
+  `ip route`: for each interface that is up (Wi-Fi, USB, Ethernet), its IPv4 subnet in
+  CIDR form (for example `192.168.1.0/24`) and its global IPv6 prefix.
+- Skip loopback, link-local (`169.254.0.0/16`, `fe80::/10`) and down interfaces.
+- Used in three places:
+  - the add-rule form offers **This network (192.168.1.0/24, wlan0)** as a source,
+    next to "any" and a typed IP/CIDR;
+  - presets can be applied "from this network only", for example SSH from the LAN;
+  - the listening-ports page labels a partial verdict **LAN only** when the allowed
+    source is the current subnet.
+- Re-read whenever the add-rule form or ports page opens, because the device moves
+  between networks. A rule stores the subnet as it was when added; if the network
+  changes later, the rule does not follow it.
+
+### 6. Root access
 - sudo password asked on launch (the launcher starts apps as a normal user), passed to
   `sudo -S` over stdin, kept in memory only, never written to disk or logs.
 - Skipped when running as root or with passwordless sudo.
 
-### 6. Safety
+### 7. Safety
 - **Confirm every change**: show the exact ufw command(s) and the dry-run result;
   Enter applies, Esc cancels.
 - **SSH lockout guard**: find the SSH port(s) sshd listens on (`ss -tlnp`) and whether
@@ -68,7 +83,7 @@ Keyboard-driven (46-key matrix).
   the firewall on or off, and enabling or disabling is not recorded as an undoable
   change.
 
-### 7. Packaging
+### 8. Packaging
 - Depends on `ufw` and `sudo`.
 - No background service. (The store rejects packages whose bundled systemd service runs
   as root, and Ipdoit does not need one.)
