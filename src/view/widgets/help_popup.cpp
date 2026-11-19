@@ -21,19 +21,47 @@ struct HelpRow {
     const char* action;
 };
 
-constexpr std::array<HelpRow, 5> kAppleRows = {{
-    {"HOLD ESC / 4", "Exit"},
-    {"5", "Text weight"},
-    {"6", "Light / dark"},
-    {"7", "Version info"},
-    {"8", "Open counter"},
-}};
+struct PageHelp {
+    const char* badge;
+    std::array<HelpRow, 5> rows;
+    std::size_t count;
+};
 
-constexpr std::array<HelpRow, 3> kButterRows = {{
-    {"ESC", "Back to home"},
-    {"Z / LEFT", "Decrease"},
-    {"C / RIGHT", "Increase"},
-}};
+PageHelp help_for(model::AppPage page) {
+    switch (page) {
+        case model::AppPage::Password:
+            return {"PASSWORD", {{{"type", "sudo password"}, {"ENTER", "Unlock"},
+                                  {"ESC", "Quit"}}}, 3};
+        case model::AppPage::Status:
+            return {"STATUS", {{{"E", "Firewall on/off"}, {"W", "Whitelist this network"},
+                                {"U", "Undo last rule change"}, {"< / >", "Other pages"},
+                                {"R", "Refresh"}}}, 5};
+        case model::AppPage::Rules:
+            return {"RULES", {{{"UP / DOWN", "Select"}, {"A / ENTER", "Add with form"},
+                               {"F", "Type a ufw rule"}, {"D / DEL", "Delete selected"},
+                               {"< / >", "Other pages"}}}, 5};
+        case model::AppPage::Ports:
+            return {"PORTS", {{{"UP / DOWN", "Scroll"}, {"R", "Refresh"},
+                               {"< / >", "Other pages"}}}, 3};
+        case model::AppPage::Networks:
+            return {"NETWORKS", {{{"UP / DOWN", "Select"}, {"ENTER", "Toggle current"},
+                                  {"D / DEL", "Remove from whitelist"},
+                                  {"< / >", "Other pages"}}}, 4};
+        case model::AppPage::AddRule:
+            return {"ADD RULE", {{{"UP / DOWN", "Field"}, {"< / >", "Change choice"},
+                                  {"1 - 5", "Preset (on a choice)"}, {"ENTER", "Check rule"},
+                                  {"ESC", "Back"}}}, 5};
+        case model::AppPage::FreeForm:
+            return {"TYPE RULE", {{{"type", "what follows ufw"}, {"ENTER", "Check rule"},
+                                   {"ESC", "Back"}}}, 3};
+        case model::AppPage::Confirm:
+            return {"CONFIRM", {{{"ENTER", "Apply"}, {"ENTER x2", "Apply despite warning"},
+                                 {"ESC", "Cancel"}}}, 3};
+        case model::AppPage::Message:
+            return {"MESSAGE", {{{"UP / DOWN", "Scroll"}, {"ENTER / ESC", "Back"}}}, 2};
+    }
+    return {"", {}, 0};
+}
 
 } // namespace
 
@@ -156,18 +184,16 @@ bool HelpPopup::visible() const {
 }
 
 void HelpPopup::update_rows(model::AppPage page) {
-    const bool butter = page == model::AppPage::Butter;
-    lv_label_set_text(page_badge_, butter ? "COUNTER" : "HOME");
+    const auto help = help_for(page);
+    lv_label_set_text(page_badge_, help.badge);
     for (std::size_t i = 0; i < rows_.size(); ++i) {
-        const bool row_visible = butter ? i < kButterRows.size() : i < kAppleRows.size();
-        if (!row_visible) {
+        if (i >= help.count) {
             lv_obj_add_flag(rows_[i].row, LV_OBJ_FLAG_HIDDEN);
             continue;
         }
         lv_obj_remove_flag(rows_[i].row, LV_OBJ_FLAG_HIDDEN);
-        const auto& row = butter ? kButterRows[i] : kAppleRows[i];
-        lv_label_set_text(rows_[i].key, row.key);
-        lv_label_set_text(rows_[i].action, row.action);
+        lv_label_set_text(rows_[i].key, help.rows[i].key);
+        lv_label_set_text(rows_[i].action, help.rows[i].action);
     }
 }
 

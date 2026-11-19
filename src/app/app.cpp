@@ -116,11 +116,16 @@ public:
           help_popup_(std::make_unique<view::widgets::HelpPopup>(lv_layer_top(), view_model, assets)) {
         toast_->build();
         help_popup_->build();
+        // Success notices from the view model ("Add rule: done", "Busy", ...)
+        notice_observer_ = lv_subject_add_observer(view_model_.notice_subject(), notice_cb, this);
         platform::set_global_key_listener(global_key_listener, this);
         platform::set_key_release_listener(key_release_listener, this);
     }
 
     ~ShortcutController() {
+        if (notice_observer_) {
+            lv_observer_remove(notice_observer_);
+        }
         platform::clear_key_release_listener(key_release_listener, this);
         platform::clear_global_key_listener(global_key_listener, this);
     }
@@ -169,47 +174,22 @@ private:
             return true;
         }
 
-        const bool is_escape = key == LV_KEY_ESC;
-        const bool is_home_exit_key =
-            key == '4' &&
-            ((!long_pressed && view_model_.current_page() == model::AppPage::Apple) ||
-             (long_pressed && exit_key_pressed_ == key));
-        if (!is_escape && !is_home_exit_key) {
-            return false;
+        // Short ESC goes to the screen (back / cancel). Holding ESC quits from anywhere.
+        if (key == LV_KEY_ESC && long_pressed) {
+            view_model_.request_quit();
+            return true;
         }
-
-        if (long_pressed) {
-            if (exit_key_pressed_ == key && exit_armed_) {
-                toast_->hide();
-                view_model_.request_quit();
-            }
-        }
-        else {
-            exit_key_pressed_ = key;
-            exit_armed_ = view_model_.current_page() == model::AppPage::Apple;
-            if (exit_armed_) {
-                toast_->show_persistent_highlighted("Hold ",
-                                                    "ESC",
-                                                    " to exit",
-                                                    view::widgets::ToastTone::Warning);
-            }
-        }
-        return true;
+        return false;
     }
 
-    void handle_release(uint32_t key) {
-        if (key != exit_key_pressed_) {
-            return;
-        }
+    void handle_release(uint32_t) {}
 
-        if (exit_armed_) {
-            toast_->hide();
-        } else if (key == LV_KEY_ESC &&
-                   view_model_.current_page() == model::AppPage::Butter) {
-            view_model_.show_apple_page();
+    static void notice_cb(lv_observer_t* observer, lv_subject_t* subject) {
+        auto* self = static_cast<ShortcutController*>(lv_observer_get_user_data(observer));
+        const char* text = lv_subject_get_string(subject);
+        if (self && text && text[0]) {
+            self->toast_->show(text, view::widgets::ToastTone::Default, 1800);
         }
-        exit_key_pressed_ = 0;
-        exit_armed_ = false;
     }
 
     static bool global_key_listener(uint32_t key,
@@ -229,9 +209,8 @@ private:
 
     viewmodel::BaseViewModel& view_model_;
     std::unique_ptr<view::widgets::Toast> toast_;
+    lv_observer_t* notice_observer_{nullptr};
     std::unique_ptr<view::widgets::HelpPopup> help_popup_;
-    uint32_t exit_key_pressed_{0};
-    bool exit_armed_{false};
 };
 
 #if !USE_DESKTOP
@@ -270,7 +249,7 @@ lv_display_t* init_device_display() {
 
 int Application::run() {
     logger::Logger::init();
-    logger::Logger::set_tag("template");
+    logger::Logger::set_tag("ipdoit");
 
     lv_init();
 
@@ -320,8 +299,16 @@ int Application::run() {
     simulator_frame.bind_dark_mode(view_model.dark_mode_subject());
 #endif
 
+    view_model.start(); // picks the first page (password or menu)
     ScreenManager screen_manager(view_model, assets);
     screen_manager.start();
+
+    // Poll the apt worker thread from the UI thread.
+    auto* job_timer = lv_timer_create(
+        [](lv_timer_t* timer) {
+            static_cast<viewmodel::BaseViewModel*>(lv_timer_get_user_data(timer))->tick();
+        },
+        100, &view_model);
     ShortcutController shortcuts(view_model, assets);
 
     DarkModePersistence dark_mode_persistence{user_config_path, view_model.is_dark_mode()};
@@ -345,6 +332,9 @@ int Application::run() {
         lv_delay_ms(5);
     }
 
+    if (job_timer) {
+        lv_timer_delete(job_timer);
+    }
     if (quit_observer) {
         lv_observer_remove(quit_observer);
     }
