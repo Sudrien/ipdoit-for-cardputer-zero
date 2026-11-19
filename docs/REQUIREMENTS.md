@@ -29,12 +29,29 @@ Keyboard-driven (46-key matrix).
 - Both paths are checked with `ufw --dry-run <rule>` before anything is applied;
   errors are shown and nothing changes.
 
-### 4. Root access
+### 4. Listening ports
+- List the ports that services are listening on, from `ss -tulpn` (run as root so
+  every process name is shown): protocol, port, bound address and process.
+- For each, show whether UFW lets it in from outside:
+  - **Allowed**: an allow rule matches from any source;
+  - **Limited**: a limit rule matches;
+  - **Partial**: allowed only from some sources (for example a LAN subnet);
+  - **Blocked**: no allow/limit rule matches and incoming is denied or rejected, or a
+    deny/reject rule matches first;
+  - **Local only**: bound to a loopback address (127.0.0.1 or ::1), so not reachable
+    from outside whatever the firewall says;
+  - **Firewall off**: UFW is inactive, so everything that listens is reachable.
+- Rules are matched in order, first match wins, as ufw does: by port (and port ranges),
+  protocol, and direction in. IPv4 and IPv6 are judged separately, so a port can be
+  allowed on one and blocked on the other.
+- Refreshed when the page opens and after every rule change.
+
+### 5. Root access
 - sudo password asked on launch (the launcher starts apps as a normal user), passed to
   `sudo -S` over stdin, kept in memory only, never written to disk or logs.
 - Skipped when running as root or with passwordless sudo.
 
-### 5. Safety
+### 6. Safety
 - **Confirm every change**: show the exact ufw command(s) and the dry-run result;
   Enter applies, Esc cancels.
 - **SSH lockout guard**: find the SSH port(s) sshd listens on (`ss -tlnp`) and whether
@@ -51,7 +68,7 @@ Keyboard-driven (46-key matrix).
   the firewall on or off, and enabling or disabling is not recorded as an undoable
   change.
 
-### 6. Packaging
+### 7. Packaging
 - Depends on `ufw` and `sudo`.
 - No background service. (The store rejects packages whose bundled systemd service runs
   as root, and Ipdoit does not need one.)
@@ -60,7 +77,8 @@ Keyboard-driven (46-key matrix).
 
 - Logging level (`ufw logging off|low|medium|high`) and a viewer for recent
   `[UFW BLOCK]` log lines.
-- Pick a port to allow or deny from the list of listening ports (`ss -tulpn`).
+- From the listening-ports list, pick a port to open the add-rule form prefilled
+  with its port and protocol.
 - Application profiles (`ufw app list`, `ufw allow <profile>`).
 - Changing default policies, and routed/forward rules.
 - Undo history beyond the last change (browse and restore any of the kept backups).
@@ -78,3 +96,6 @@ Keyboard-driven (46-key matrix).
   support ufw needs (iptables-nft)? Must be checked on hardware.
 - Is sshd enabled by default on the device (SSH over Wi-Fi or USB)? This decides how
   often the lockout guard matters.
+- The blocked/allowed verdict follows ufw's user rules; rules added outside ufw
+  (`/etc/ufw/before.rules`, raw iptables/nftables) are not evaluated. The page should
+  say so.
