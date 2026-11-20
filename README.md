@@ -55,9 +55,9 @@ features.
 - Deleting finds the rule's current number by its tuple inside the lock, so a rule number
   that shifted in the meantime is never deleted.
 - My network rules are kept as templates in `/etc/ipdoit-for-cardputer-zero/mynet-rules.conf`; the live ufw
-  rules carry an `ipdoit:mynet:<id>` comment. A NetworkManager dispatcher hook
-  (`/usr/lib/NetworkManager/dispatcher.d/ipdoit-for-cardputer-zero`) re-syncs them when a connection changes,
-  and the app does too when it opens. If the gateway's MAC is not known yet (just
+  rules carry an `ipdoit:mynet:<id>` comment. The app re-syncs them when it opens
+  (and on install). For re-syncing on every connection change while the app is closed,
+  enable the optional NetworkManager hook (see below). If the gateway's MAC is not known yet (just
   connected), existing whitelisted-only rules for that network are kept until it is.
 - Undo backups (last 10) are in `/var/lib/ipdoit-for-cardputer-zero/backups/`.
 - Port verdicts follow ufw's own rules only; rules added outside ufw (`before.rules`, raw
@@ -77,13 +77,27 @@ ipdoit-helper sync
 ipdoit-helper undo
 ```
 
+## Optional: follow network changes automatically
+
+The app store does not let packages install into NetworkManager's own directories, so
+the dispatcher hook ships inactive. To have My network rules re-synced whenever a
+connection comes up, goes down or changes address (even with the app closed):
+
+```shell
+sudo ln -s /usr/lib/ipdoit-for-cardputer-zero/nm-dispatcher \
+    /etc/NetworkManager/dispatcher.d/90-ipdoit-for-cardputer-zero
+```
+
+Without it, "My network (whitelisted only)" rules stay as they were until Ipdoit is next
+opened. Removing the package deletes the link.
+
 ## Installed files
 
 | Path | Purpose |
 | --- | --- |
 | `/usr/bin/ipdoit-for-cardputer-zero` | the app (started by the launcher) |
 | `/usr/lib/ipdoit-for-cardputer-zero/ipdoit-helper` | root helper |
-| `/usr/lib/NetworkManager/dispatcher.d/ipdoit-for-cardputer-zero` | re-syncs My network rules on network changes |
+| `/usr/lib/ipdoit-for-cardputer-zero/nm-dispatcher` | optional NetworkManager hook (inactive until linked) |
 | `/etc/ipdoit-for-cardputer-zero/whitelist.conf`, `mynet-rules.conf` | whitelist and My network templates |
 | `/var/lib/ipdoit-for-cardputer-zero/backups/` | undo backups |
 

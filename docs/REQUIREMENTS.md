@@ -79,8 +79,9 @@ Keyboard-driven (46-key matrix).
 - **Following the device**: "My network" rules are kept as templates in
   `/etc/ipdoit-for-cardputer-zero/mynet-rules.conf` (action, port, protocol, scope). The ufw rules made from
   them carry a comment tag (`ipdoit:mynet:<id>`), so they can be found and replaced.
-  A NetworkManager dispatcher script (`/usr/lib/NetworkManager/dispatcher.d/ipdoit-for-cardputer-zero`),
-  run as root by NetworkManager whenever a connection comes up, goes down or gets a new
+  An optional NetworkManager dispatcher script (shipped as
+  `/usr/lib/ipdoit-for-cardputer-zero/nm-dispatcher`, enabled by the user linking it into
+  `/etc/NetworkManager/dispatcher.d/`; the store rejects `usr/lib/NetworkManager/`), run as root by NetworkManager whenever a connection comes up, goes down or gets a new
   address, deletes the tagged rules and re-adds them for the current subnet(s) and
   whitelist. Ipdoit does the same when it opens, in case an event was missed.
 - These automatic rewrites are not undoable changes; undo covers rule changes made in
@@ -120,9 +121,9 @@ Keyboard-driven (46-key matrix).
 ### 8. Packaging
 - Depends on `ufw` and `sudo`.
 - No systemd service. (The store rejects packages whose bundled systemd service runs
-  as root.) The NetworkManager dispatcher script is a root hook, not a service; it must
-  be root-owned and mode 0755 or NetworkManager ignores it.
-- Removing the package deletes the tagged My network rules, the dispatcher script and
+  as root.) The NetworkManager dispatcher script is a root hook, not a service; it ships
+  inactive under `usr/lib/<pkg>/` and must be root-owned and mode 0755 or NetworkManager ignores it.
+- Removing the package deletes the tagged My network rules, the dispatcher link and
   `/etc/ipdoit-for-cardputer-zero` (on purge).
 
 ## Design decisions
@@ -183,8 +184,9 @@ Keyboard-driven (46-key matrix).
   not strong security. The Networks page should say so.
 - Store check: AppBuilder's `czdev publish` only rejects systemd `.service` units under
   `lib/systemd/system/`, `usr/lib/systemd/system/` or `etc/systemd/system/` that would
-  run as root (`find_root_services` in `scripts/czdev/publish.py`). The dispatcher script
-  is not a service unit, so it passes that check.
+  run as root (`find_root_services` in `scripts/czdev/publish.py`). The store's path check
+  rejects `usr/lib/NetworkManager/dispatcher.d/<pkg>` (not a `usr/lib/<pkg>/` directory),
+  so the hook ships in `usr/lib/<pkg>/` and is opt-in.
 - The blocked/allowed verdict follows ufw's user rules; rules added outside ufw
   (`/etc/ufw/before.rules`, raw iptables/nftables) are not evaluated. The page should
   say so.

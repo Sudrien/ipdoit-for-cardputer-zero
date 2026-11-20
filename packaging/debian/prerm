@@ -5,4 +5,12 @@ set -e
 if [ "$1" = "remove" ] && [ -x /usr/lib/ipdoit-for-cardputer-zero/ipdoit-helper ]; then
     /usr/lib/ipdoit-for-cardputer-zero/ipdoit-helper clear-mynet >/dev/null 2>&1 || true
 fi
+# Remove the opt-in NetworkManager hook link, but only if it points at our script.
+P=ipdoit-for-cardputer-zero
+if [ "$1" = "remove" ]; then
+    link=/etc/NetworkManager/dispatcher.d/90-$P
+    if [ -L "$link" ] && [ "$(readlink "$link")" = "/usr/lib/$P/nm-dispatcher" ]; then
+        rm -f "$link"
+    fi
+fi
 exit 0

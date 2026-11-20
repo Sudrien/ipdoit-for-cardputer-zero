@@ -44,11 +44,11 @@ install(TARGETS ipdoit-helper
 )
 
 # NetworkManager dispatcher hook: re-syncs My network rules when the network changes.
-# Not a systemd service; NetworkManager runs it as root and needs it root-owned, 0755.
-install(PROGRAMS "${CMAKE_CURRENT_SOURCE_DIR}/packaging/NetworkManager/ipdoit-for-cardputer-zero"
-    # NetworkManager also reads /usr/lib/NetworkManager/dispatcher.d; /etc/NetworkManager
-    # is not an allowed store path.
-    DESTINATION "lib/NetworkManager/dispatcher.d"
+# The store only allows files under usr/lib/<pkg>/, so it ships here, inactive. The user
+# opts in by linking it into /etc/NetworkManager/dispatcher.d/ (see README); prerm
+# removes that link. NetworkManager needs it root-owned, 0755.
+install(PROGRAMS "${CMAKE_CURRENT_SOURCE_DIR}/packaging/NetworkManager/nm-dispatcher"
+    DESTINATION "lib/ipdoit-for-cardputer-zero"
 )
 install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/packaging/tmpfiles.d/ipdoit-for-cardputer-zero.conf"
     DESTINATION "lib/tmpfiles.d"
