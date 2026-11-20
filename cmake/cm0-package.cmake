@@ -12,7 +12,7 @@ set(APP_DISPLAY_NAME "Ipdoit")
 set(APP_DEBIAN_ARCHITECTURE "arm64" CACHE STRING "Debian package architecture")
 # Deliberately a placeholder: the store rejects packages whose Maintainer is
 # still a template/M5Stack identity, so set your own name and email here.
-set(APP_MAINTAINER "TODO Your Name <todo@example.invalid>" CACHE STRING "Debian package maintainer")
+set(APP_MAINTAINER "Sudrien <_+github@sudrien.net>" CACHE STRING "Debian package maintainer")
 set(APP_PACKAGE_DESCRIPTION "UFW firewall manager for CardputerZero" CACHE STRING "Debian package summary")
 # Off: the launcher starts Ipdoit from its .desktop entry, and the store rejects packages
 # whose bundled systemd service runs as root.
