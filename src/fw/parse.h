@@ -31,11 +31,11 @@ std::vector<Network> parse_networks(const std::string& addrs, const std::string&
 // `ufw status verbose` (LC_ALL=C)
 Status parse_status_verbose(const std::string& text);
 
-// /etc/ipdoit/whitelist.conf: "<key> <subnet4> <name...>"
+// /etc/ipdoit-for-cardputer-zero/whitelist.conf: "<key> <subnet4> <name...>"
 std::vector<WhitelistEntry> parse_whitelist(const std::string& text);
 std::string format_whitelist(const std::vector<WhitelistEntry>& entries);
 
-// /etc/ipdoit/mynet-rules.conf: "<id> <action> <proto> <port> <scope> <comment-hex|->"
+// /etc/ipdoit-for-cardputer-zero/mynet-rules.conf: "<id> <action> <proto> <port> <scope> <comment-hex|->"
 std::vector<Template> parse_templates(const std::string& text);
 std::string format_templates(const std::vector<Template>& templates);
 

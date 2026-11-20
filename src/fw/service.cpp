@@ -39,7 +39,7 @@ std::string FirewallService::helper_path() {
     if (const char* p = std::getenv("IPDOIT_HELPER"); p && p[0] == '/') {
         return p;
     }
-    return "/usr/libexec/ipdoit/ipdoit-helper";
+    return "/usr/lib/ipdoit-for-cardputer-zero/ipdoit-helper";
 }
 
 int FirewallService::run_helper(const std::vector<std::string>& args, std::string& output) {

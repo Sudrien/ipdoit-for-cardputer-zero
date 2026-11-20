@@ -3,14 +3,28 @@ set -e
 # 0.1.0 shipped the template's /etc/template-app.conf, which every app from the
 # template also ships; remove it (kept as .dpkg-bak if it was edited).
 dpkg-maintscript-helper rm_conffile /etc/template-app.conf 0.1.1~ -- "$@"
+P=ipdoit-for-cardputer-zero
 if [ "$1" = "configure" ]; then
-    mkdir -p /etc/ipdoit /var/lib/ipdoit/backups
-    chmod 755 /etc/ipdoit
-    chmod 700 /var/lib/ipdoit
+    # /etc/$P and /var/lib/$P/backups (modes in the package's tmpfiles.d entry)
+    systemd-tmpfiles --create "$P.conf" >/dev/null 2>&1 || true
+    # Before 0.2.2 the state lived in /etc/ipdoit and /var/lib/ipdoit.
+    for f in whitelist.conf mynet-rules.conf; do
+        if [ -f "/etc/ipdoit/$f" ] && [ ! -e "/etc/$P/$f" ]; then
+            mv "/etc/ipdoit/$f" "/etc/$P/$f"
+        fi
+    done
+    rmdir /etc/ipdoit 2>/dev/null || true
+    if [ -d /var/lib/ipdoit/backups ]; then
+        for b in /var/lib/ipdoit/backups/*; do
+            [ -e "$b" ] || continue
+            [ -e "/var/lib/$P/backups/${b##*/}" ] || mv "$b" "/var/lib/$P/backups/"
+        done
+        rmdir /var/lib/ipdoit/backups /var/lib/ipdoit 2>/dev/null || true
+    fi
     # Bring My network rules in line with the current network (no-op on first install).
-    /usr/libexec/ipdoit/ipdoit-helper sync >/dev/null 2>&1 || true
+    /usr/lib/$P/ipdoit-helper sync >/dev/null 2>&1 || true
     # SSH exception: if sshd is enabled and nothing allows it, add "limit <port>/tcp" now,
     # so turning the firewall on later cannot lock out SSH.
-    /usr/libexec/ipdoit/ipdoit-helper ssh-allow >/dev/null 2>&1 || true
+    /usr/lib/$P/ipdoit-helper ssh-allow >/dev/null 2>&1 || true
 fi
 exit 0

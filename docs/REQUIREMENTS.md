@@ -69,7 +69,7 @@ Keyboard-driven (46-key matrix).
     showing its subnet and gateway first. When the current network is already
     whitelisted, the button removes it instead.
   - A Networks page lists whitelisted networks and can remove any of them.
-  - The whitelist is kept in `/etc/ipdoit/whitelist.conf` (root-owned).
+  - The whitelist is kept in `/etc/ipdoit-for-cardputer-zero/whitelist.conf` (root-owned).
 - **"My network" as a rule source**, with two choices per rule:
   - **My network, whitelisted only** (default): the rule exists only while the device is
     on a whitelisted network, with that network's subnet as the source. On any other
@@ -77,9 +77,9 @@ Keyboard-driven (46-key matrix).
   - **My network, any network**: the rule follows the current subnet everywhere,
     whitelisted or not.
 - **Following the device**: "My network" rules are kept as templates in
-  `/etc/ipdoit/mynet-rules.conf` (action, port, protocol, scope). The ufw rules made from
+  `/etc/ipdoit-for-cardputer-zero/mynet-rules.conf` (action, port, protocol, scope). The ufw rules made from
   them carry a comment tag (`ipdoit:mynet:<id>`), so they can be found and replaced.
-  A NetworkManager dispatcher script (`/etc/NetworkManager/dispatcher.d/90-ipdoit`),
+  A NetworkManager dispatcher script (`/usr/lib/NetworkManager/dispatcher.d/ipdoit-for-cardputer-zero`),
   run as root by NetworkManager whenever a connection comes up, goes down or gets a new
   address, deletes the tagged rules and re-adds them for the current subnet(s) and
   whitelist. Ipdoit does the same when it opens, in case an event was missed.
@@ -112,7 +112,7 @@ Keyboard-driven (46-key matrix).
   each port sshd listens on (or, if sshd is enabled but not running, its configured port)
   when nothing else lets it in. Everything else stays blocked by default.
 - **Undo last change**: before each rule change, back up `/etc/ufw/user.rules` and
-  `/etc/ufw/user6.rules` into `/var/lib/ipdoit/backups/` (last 10 kept). Undo restores
+  `/etc/ufw/user6.rules` into `/var/lib/ipdoit-for-cardputer-zero/backups/` (last 10 kept). Undo restores
   the most recent backup and runs `ufw reload`. Undo covers rules only: it never turns
   the firewall on or off, and enabling or disabling is not recorded as an undoable
   change.
@@ -123,7 +123,7 @@ Keyboard-driven (46-key matrix).
   as root.) The NetworkManager dispatcher script is a root hook, not a service; it must
   be root-owned and mode 0755 or NetworkManager ignores it.
 - Removing the package deletes the tagged My network rules, the dispatcher script and
-  `/etc/ipdoit` (on purge).
+  `/etc/ipdoit-for-cardputer-zero` (on purge).
 
 ## Design decisions
 
@@ -131,12 +131,12 @@ Keyboard-driven (46-key matrix).
    entry (its template), not the live ufw rules made from it. Deleting it removes the
    template and every live ufw rule tagged with its id. Deleting only the ufw rule would
    make the next sync bring it back.
-2. **Undo and My network**: backups also include `/etc/ipdoit/mynet-rules.conf`. Undo
+2. **Undo and My network**: backups also include `/etc/ipdoit-for-cardputer-zero/mynet-rules.conf`. Undo
    restores it with the rules files, then re-syncs My network for the current network,
    so rules for a previous network are not brought back. Whitelist changes are not
    undoable changes.
 3. **One change at a time**: ufw has no locking of its own. The app and the dispatcher
-   both take `/run/ipdoit.lock` (flock) before changing anything.
+   both take `/run/ipdoit-for-cardputer-zero.lock` (flock) before changing anything.
 4. **Free-form is limited to rule commands**: only `allow`, `deny`, `reject` and
    `limit`, optionally after `insert N`. Commands such as `reset`, `disable`,
    `default`, `delete`, `logging` and `route` are refused. Input is split into
@@ -147,7 +147,7 @@ Keyboard-driven (46-key matrix).
 6. **Code**: Updoit's process runner and sudo handling are copied into this repo, not
    shared as a library.
 7. **Root helper**: every privileged step goes through one program,
-   `/usr/libexec/ipdoit/ipdoit-helper`, run with sudo by the app and directly by the
+   `/usr/lib/ipdoit-for-cardputer-zero/ipdoit-helper`, run with sudo by the app and directly by the
    dispatcher. It takes the lock, makes the backup, runs ufw, and syncs My network.
    Reading the firewall state is one helper call that prints ufw status, the rules
    (from the tuples in `/etc/ufw/user.rules` and `user6.rules`, which are root-only),

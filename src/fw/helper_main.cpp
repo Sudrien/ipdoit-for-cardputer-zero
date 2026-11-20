@@ -3,7 +3,7 @@
  */
 
 // ipdoit-helper: every privileged Ipdoit step, run as root (via sudo from the app, or
-// directly from the NetworkManager dispatcher). Changes happen under /run/ipdoit.lock.
+// directly from the NetworkManager dispatcher). Changes happen under /run/ipdoit-for-cardputer-zero.lock.
 //
 //   state                                  print everything the app shows
 //   enable | disable
@@ -51,11 +51,11 @@ namespace {
 const char* kUserRules = "/etc/ufw/user.rules";
 const char* kUserRules6 = "/etc/ufw/user6.rules";
 const char* kUfwDefaults = "/etc/default/ufw";
-const char* kEtcDir = "/etc/ipdoit";
-const char* kWhitelist = "/etc/ipdoit/whitelist.conf";
-const char* kTemplates = "/etc/ipdoit/mynet-rules.conf";
-const char* kBackupDir = "/var/lib/ipdoit/backups";
-const char* kLock = "/run/ipdoit.lock";
+const char* kEtcDir = "/etc/ipdoit-for-cardputer-zero";
+const char* kWhitelist = "/etc/ipdoit-for-cardputer-zero/whitelist.conf";
+const char* kTemplates = "/etc/ipdoit-for-cardputer-zero/mynet-rules.conf";
+const char* kBackupDir = "/var/lib/ipdoit-for-cardputer-zero/backups";
+const char* kLock = "/run/ipdoit-for-cardputer-zero.lock";
 constexpr size_t kKeepBackups = 10;
 
 std::string read_file(const std::string& path) {

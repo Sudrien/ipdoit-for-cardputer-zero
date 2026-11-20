@@ -12,7 +12,7 @@ case "$2" in
     *) exit 0 ;;
 esac
 
-helper=/usr/libexec/ipdoit/ipdoit-helper
+helper=/usr/lib/ipdoit-for-cardputer-zero/ipdoit-helper
 [ -x "$helper" ] || exit 0
 
 "$helper" sync 2>&1 | logger -t ipdoit || true

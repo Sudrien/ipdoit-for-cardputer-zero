@@ -39,13 +39,19 @@ install(TARGETS ${PROJECT_NAME}
 
 # Root helper: every privileged step, run with sudo by the app or by the dispatcher hook.
 install(TARGETS ipdoit-helper
-    RUNTIME DESTINATION "${CMAKE_INSTALL_LIBEXECDIR}/ipdoit"
+    # store rule: helpers live in usr/lib/<pkg>/
+    RUNTIME DESTINATION "lib/ipdoit-for-cardputer-zero"
 )
 
 # NetworkManager dispatcher hook: re-syncs My network rules when the network changes.
 # Not a systemd service; NetworkManager runs it as root and needs it root-owned, 0755.
-install(PROGRAMS "${CMAKE_CURRENT_SOURCE_DIR}/packaging/NetworkManager/90-ipdoit"
-    DESTINATION "/etc/NetworkManager/dispatcher.d"
+install(PROGRAMS "${CMAKE_CURRENT_SOURCE_DIR}/packaging/NetworkManager/ipdoit-for-cardputer-zero"
+    # NetworkManager also reads /usr/lib/NetworkManager/dispatcher.d; /etc/NetworkManager
+    # is not an allowed store path.
+    DESTINATION "lib/NetworkManager/dispatcher.d"
+)
+install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/packaging/tmpfiles.d/ipdoit-for-cardputer-zero.conf"
+    DESTINATION "lib/tmpfiles.d"
 )
 
 install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/config/ipdoit-for-cardputer-zero.conf"

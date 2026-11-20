@@ -4,7 +4,9 @@ set -e
 # template also ships; remove it (kept as .dpkg-bak if it was edited).
 dpkg-maintscript-helper rm_conffile /etc/template-app.conf 0.1.1~ -- "$@"
 if [ "$1" = "purge" ]; then
-    rm -rf /etc/ipdoit /var/lib/ipdoit
-    rm -f /run/ipdoit.lock
+    # Whitelist, My network templates and undo backups; only this package's own dirs.
+    rm -f /etc/ipdoit-for-cardputer-zero/whitelist.conf /etc/ipdoit-for-cardputer-zero/mynet-rules.conf /run/ipdoit-for-cardputer-zero.lock
+    rmdir /etc/ipdoit-for-cardputer-zero 2>/dev/null || true
+    rm -rf /var/lib/ipdoit-for-cardputer-zero
 fi
 exit 0

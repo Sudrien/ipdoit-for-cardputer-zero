@@ -48,18 +48,18 @@ features.
 ## How it works
 
 - The app runs as your user. Every privileged step goes through one root helper,
-  `/usr/libexec/ipdoit/ipdoit-helper`, run with `sudo`. It takes `/run/ipdoit.lock`, backs
+  `/usr/lib/ipdoit-for-cardputer-zero/ipdoit-helper`, run with `sudo`. It takes `/run/ipdoit-for-cardputer-zero.lock`, backs
   up the rules, runs ufw, and re-syncs My network rules.
 - The firewall state is read in one helper call: `ufw status verbose`, the rule tuples from
   `/etc/ufw/user.rules` and `user6.rules`, `ss -tulpn`, and `ip addr/route/neigh`.
 - Deleting finds the rule's current number by its tuple inside the lock, so a rule number
   that shifted in the meantime is never deleted.
-- My network rules are kept as templates in `/etc/ipdoit/mynet-rules.conf`; the live ufw
+- My network rules are kept as templates in `/etc/ipdoit-for-cardputer-zero/mynet-rules.conf`; the live ufw
   rules carry an `ipdoit:mynet:<id>` comment. A NetworkManager dispatcher hook
-  (`/etc/NetworkManager/dispatcher.d/90-ipdoit`) re-syncs them when a connection changes,
+  (`/usr/lib/NetworkManager/dispatcher.d/ipdoit-for-cardputer-zero`) re-syncs them when a connection changes,
   and the app does too when it opens. If the gateway's MAC is not known yet (just
   connected), existing whitelisted-only rules for that network are kept until it is.
-- Undo backups (last 10) are in `/var/lib/ipdoit/backups/`.
+- Undo backups (last 10) are in `/var/lib/ipdoit-for-cardputer-zero/backups/`.
 - Port verdicts follow ufw's own rules only; rules added outside ufw (`before.rules`, raw
   iptables/nftables) are not evaluated.
 
@@ -82,13 +82,13 @@ ipdoit-helper undo
 | Path | Purpose |
 | --- | --- |
 | `/usr/bin/ipdoit-for-cardputer-zero` | the app (started by the launcher) |
-| `/usr/libexec/ipdoit/ipdoit-helper` | root helper |
-| `/etc/NetworkManager/dispatcher.d/90-ipdoit` | re-syncs My network rules on network changes |
-| `/etc/ipdoit/whitelist.conf`, `mynet-rules.conf` | whitelist and My network templates |
-| `/var/lib/ipdoit/backups/` | undo backups |
+| `/usr/lib/ipdoit-for-cardputer-zero/ipdoit-helper` | root helper |
+| `/usr/lib/NetworkManager/dispatcher.d/ipdoit-for-cardputer-zero` | re-syncs My network rules on network changes |
+| `/etc/ipdoit-for-cardputer-zero/whitelist.conf`, `mynet-rules.conf` | whitelist and My network templates |
+| `/var/lib/ipdoit-for-cardputer-zero/backups/` | undo backups |
 
 Depends on `ufw`, `sudo` and `iproute2`. There is no systemd service. Removing the package
-takes the live My network rules out of ufw; purging also deletes `/etc/ipdoit` and the
+takes the live My network rules out of ufw; purging also deletes `/etc/ipdoit-for-cardputer-zero` and the
 backups.
 
 ## Screenshots
