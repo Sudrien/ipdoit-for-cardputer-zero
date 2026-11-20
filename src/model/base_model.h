@@ -44,7 +44,7 @@ public:
     void set_current_page(AppPage page);
 
 private:
-    bool dark_mode_ = false;
+    bool dark_mode_ = true;
     AppPage current_page_ = AppPage::Status;
 };
 
