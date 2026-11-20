@@ -5,11 +5,11 @@ set -e
 dpkg-maintscript-helper rm_conffile /etc/template-app.conf 0.1.1~ -- "$@"
 if [ "$1" = "purge" ]; then
     # Whitelist, My network templates and undo backups. Only named files in this
-    # package's own directories are removed: no recursive rm, no paths built from
-    # variables, so nothing outside them can ever be touched.
-    rm -f /etc/ipdoit-for-cardputer-zero/whitelist.conf \
-          /etc/ipdoit-for-cardputer-zero/mynet-rules.conf \
-          /run/ipdoit-for-cardputer-zero.lock
+    # package's own directories are removed: no recursive rm, fixed paths only, so
+    # nothing outside them can ever be touched.
+    etc_dir=/etc/ipdoit-for-cardputer-zero
+    rm -f "$etc_dir/whitelist.conf" "$etc_dir/mynet-rules.conf" \
+          "/run/ipdoit-for-cardputer-zero.lock"
     rmdir /etc/ipdoit-for-cardputer-zero 2>/dev/null || true
     # Each undo backup is a directory holding copies of these three files.
     for b in /var/lib/ipdoit-for-cardputer-zero/backups/*/; do
