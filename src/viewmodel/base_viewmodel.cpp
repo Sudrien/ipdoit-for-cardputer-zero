@@ -207,6 +207,7 @@ void BaseViewModel::rebuild_views() {
     }
 
     port_rows_ = fw::port_rows(state_);
+    port_entries_ = fw::port_entries(state_);
 
     network_entries_.clear();
     for (const auto& n : state_.networks) {
@@ -235,6 +236,8 @@ void BaseViewModel::rebuild_views() {
 
     const int rn = static_cast<int>(rule_entries_.size());
     rules_index_ = std::clamp(rules_index_, 0, std::max(0, rn - 1));
+    const int pn = static_cast<int>(port_entries_.size());
+    ports_index_ = std::clamp(ports_index_, 0, std::max(0, pn - 1));
     const int nn = static_cast<int>(network_entries_.size());
     networks_index_ = std::clamp(networks_index_, 0, std::max(0, nn - 1));
 }
@@ -392,6 +395,10 @@ void BaseViewModel::move_selection(int delta) {
         const int n = static_cast<int>(rule_entries_.size());
         rules_index_ = n ? std::clamp(rules_index_ + delta, 0, n - 1) : 0;
     }
+    else if (model_.current_page() == AppPage::Ports) {
+        const int n = static_cast<int>(port_entries_.size());
+        ports_index_ = n ? std::clamp(ports_index_ + delta, 0, n - 1) : 0;
+    }
     else if (model_.current_page() == AppPage::Networks) {
         const int n = static_cast<int>(network_entries_.size());
         networks_index_ = n ? std::clamp(networks_index_ + delta, 0, n - 1) : 0;
@@ -437,8 +444,11 @@ void BaseViewModel::toggle_enable() {
         c.helper_args = {"enable"};
         fw::Status after = state_.status;
         after.active = true;
-        c.warning = fw::ssh_guard(state_, after, state_.rules4, state_.rules6);
         c.note = "Incoming default: " + state_.status.default_in + ".";
+        // The helper adds "limit <port>/tcp" for sshd when nothing allows it (SSH exception).
+        if (!fw::ssh_guard(state_, after, state_.rules4, state_.rules6).empty()) {
+            c.note += " SSH will be allowed (rate-limited) so you are not locked out.";
+        }
     }
     open_confirm(std::move(c));
 }
@@ -536,6 +546,43 @@ void BaseViewModel::remove_selected_network() {
     c.command = e.text;
     c.helper_args = {"whitelist-remove", e.key, e.subnet4};
     open_confirm(std::move(c));
+}
+
+void BaseViewModel::toggle_selected_port() {
+    if (ports_index_ < 0 || ports_index_ >= static_cast<int>(port_entries_.size())) return;
+    const auto& e = port_entries_[ports_index_];
+    if (e.local_only) {
+        notice("Only listens on this device; the firewall does not apply");
+        return;
+    }
+    if (service_->busy()) {
+        notice("Busy - try again in a moment");
+        return;
+    }
+    const auto target = fw::next_port_state(e.state);
+    const char* word = target == fw::PortState::Blocked ? "blocked"
+                       : target == fw::PortState::Lan   ? "lan"
+                                                        : "allowed";
+    PendingChange c;
+    c.return_page = AppPage::Ports;
+    c.title = e.proto + " " + std::to_string(e.port) + ": " + fw::port_state_label(target);
+    c.command = "port " + std::to_string(e.port) + "/" + e.proto + " -> " + fw::port_state_label(target);
+    c.helper_args = {"port-set", std::to_string(e.port), e.proto, word};
+    std::vector<fw::Rule> after4, after6;
+    fw::simulate_port_set(state_, e.proto, e.port, target, after4, after6);
+    c.warning = fw::ssh_guard(state_, state_.status, after4, after6);
+    if (!c.warning.empty()) {
+        if (target == fw::PortState::Lan && !current_network_whitelisted()) {
+            c.note = "LAN means My network (whitelisted only), and this network is not whitelisted.";
+        }
+        open_confirm(std::move(c)); // only lockouts need confirming
+        return;
+    }
+    // instant: apply now, toast on success (U undoes)
+    pending_ = std::move(c);
+    pending_.request = service_->apply(pending_.helper_args);
+    pending_.phase = PendingChange::Phase::Applying;
+    bump();
 }
 
 // =========================================================== add-rule form
@@ -808,7 +855,7 @@ void BaseViewModel::confirm_accept() {
 void BaseViewModel::finish_apply(const FirewallService::Result& result) {
     const auto back_to = pending_.return_page;
     if (result.ok) {
-        notice(pending_.title + ": done");
+        notice(pending_.title + (back_to == AppPage::Ports ? "  (U undo)" : ": done"));
         pending_ = PendingChange{};
         show_page(back_to);
     }

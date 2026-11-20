@@ -41,8 +41,8 @@ PageHelp help_for(model::AppPage page) {
                                {"T", "Type a ufw rule"}, {"D / DEL", "Delete selected"},
                                {"< / >", "Other pages"}}}, 5};
         case model::AppPage::Ports:
-            return {"PORTS", {{{"UP / DOWN", "Scroll"}, {"R", "Refresh"},
-                               {"< / >", "Other pages"}}}, 3};
+            return {"PORTS", {{{"UP / DOWN", "Select"}, {"ENTER", "Blocked/LAN/Allowed"},
+                               {"U", "Undo"}, {"R", "Refresh"}, {"< / >", "Other pages"}}}, 5};
         case model::AppPage::Networks:
             return {"NETWORKS", {{{"UP / DOWN", "Select"}, {"ENTER", "Toggle current"},
                                   {"D / DEL", "Remove from whitelist"},

@@ -49,6 +49,34 @@ std::vector<PortRow> port_rows(const State& state, const Status& status,
                                const std::vector<Rule>& rules4,
                                const std::vector<Rule>& rules6);
 
+// ---------------------------------------------------------------- port toggles
+
+// The Ports page's per-port switch. Blocked: no rule opens it. Lan: a My network
+// (whitelisted only) rule. Allowed: an allow/limit rule from anywhere.
+enum class PortState { Blocked, Lan, Allowed };
+const char* port_state_label(PortState s);
+PortState next_port_state(PortState s); // Blocked -> Lan -> Allowed -> Blocked
+
+// One row of the merged list: listening ports plus ports that only have rules.
+struct PortEntry {
+    std::string proto;   // tcp / udp (any for rules without a protocol)
+    int port = 0;
+    std::string process; // empty when nothing listens
+    bool listening = false;
+    bool local_only = false; // listens on loopback only
+    PortState state = PortState::Blocked;
+    PortRow verdict;         // effective verdict from all rules (listening ports)
+    bool overridden = false; // another rule makes the verdict differ from the switch
+};
+
+PortState port_state(const State& state, const std::string& proto, int port);
+std::vector<PortEntry> port_entries(const State& state);
+bool is_ssh_port(const State& state, const std::string& proto, int port);
+// Rules as they would be after `port-set` (for the SSH guard).
+void simulate_port_set(const State& state, const std::string& proto, int port,
+                       PortState target, std::vector<Rule>& after4,
+                       std::vector<Rule>& after6);
+
 // ---------------------------------------------------------------- networks
 
 bool is_whitelisted(const Network& net, const std::vector<WhitelistEntry>& whitelist);

@@ -183,6 +183,173 @@ std::vector<PortRow> port_rows(const State& state, const Status& status,
     return out;
 }
 
+// ================================================================ port toggles
+
+namespace {
+
+bool from_anywhere(const Rule& r) {
+    const Cidr src = Cidr::parse(r.src);
+    const Cidr dst = Cidr::parse(r.dst);
+    return (!src.valid || src.is_any()) && (!dst.valid || dst.is_any()) && r.iface_in.empty() &&
+           r.sport == "any";
+}
+
+// An allow/limit rule from anywhere for exactly this port and protocol.
+bool exact_open_rule(const Rule& r, const std::string& proto, int port) {
+    return !r.forward && r.direction == "in" && (r.action == "allow" || r.action == "limit") &&
+           r.dport == std::to_string(port) && r.proto == proto && r.dapp.empty() &&
+           !r.is_mynet() && from_anywhere(r);
+}
+
+bool lan_template(const Template& t, const std::string& proto, int port) {
+    return (t.action == "allow" || t.action == "limit") && t.port == std::to_string(port) &&
+           t.proto == proto && t.scope == "whitelisted";
+}
+
+} // namespace
+
+const char* port_state_label(PortState s) {
+    switch (s) {
+        case PortState::Blocked: return "Blocked";
+        case PortState::Lan: return "LAN";
+        case PortState::Allowed: return "Allowed";
+    }
+    return "";
+}
+
+PortState next_port_state(PortState s) {
+    switch (s) {
+        case PortState::Blocked: return PortState::Lan;
+        case PortState::Lan: return PortState::Allowed;
+        case PortState::Allowed: return PortState::Blocked;
+    }
+    return PortState::Blocked;
+}
+
+PortState port_state(const State& state, const std::string& proto, int port) {
+    for (const auto* list : {&state.rules4, &state.rules6}) {
+        for (const auto& r : *list) {
+            if (exact_open_rule(r, proto, port)) return PortState::Allowed;
+        }
+    }
+    for (const auto& t : state.templates) {
+        if (lan_template(t, proto, port)) return PortState::Lan;
+    }
+    return PortState::Blocked;
+}
+
+bool is_ssh_port(const State& state, const std::string& proto, int port) {
+    if (proto != "tcp") return false;
+    for (const auto& s : ssh_sockets(state.sockets)) {
+        if (s.port == port) return true;
+    }
+    return false;
+}
+
+std::vector<PortEntry> port_entries(const State& state) {
+    std::vector<PortEntry> out;
+    auto find = [&out](const std::string& proto, int port) -> PortEntry* {
+        for (auto& e : out) {
+            if (e.proto == proto && e.port == port) return &e;
+        }
+        return nullptr;
+    };
+    for (const auto& row : port_rows(state)) {
+        PortEntry* e = find(row.proto, row.port);
+        if (!e) {
+            out.push_back(PortEntry{});
+            e = &out.back();
+            e->proto = row.proto;
+            e->port = row.port;
+            e->verdict = row;
+            e->process = row.process;
+            e->local_only = true;
+        }
+        e->listening = true;
+        if (e->process.empty()) e->process = row.process;
+        if (row.v4 != Verdict::LocalOnly && row.v4 != Verdict::NotApplicable) e->local_only = false;
+        if (row.v6 != Verdict::LocalOnly && row.v6 != Verdict::NotApplicable) e->local_only = false;
+    }
+    // ports that only have rules (nothing listening)
+    auto add_rule_port = [&](const std::string& proto, const std::string& dport) {
+        if (dport.empty() || dport.find_first_not_of("0123456789") != std::string::npos) return;
+        const int port = std::atoi(dport.c_str());
+        if (!find(proto, port)) {
+            PortEntry e;
+            e.proto = proto;
+            e.port = port;
+            out.push_back(e);
+        }
+    };
+    for (const auto* list : {&state.rules4, &state.rules6}) {
+        for (const auto& r : *list) {
+            if (exact_open_rule(r, r.proto, std::atoi(r.dport.c_str()))) add_rule_port(r.proto, r.dport);
+        }
+    }
+    for (const auto& t : state.templates) {
+        if (lan_template(t, t.proto, std::atoi(t.port.c_str()))) add_rule_port(t.proto, t.port);
+    }
+    for (auto& e : out) {
+        e.state = port_state(state, e.proto, e.port);
+        if (e.listening && !e.local_only && state.status.active) {
+            const auto v = e.verdict.v4 != Verdict::NotApplicable ? e.verdict.v4 : e.verdict.v6;
+            const bool open = v == Verdict::Allowed || v == Verdict::Limited;
+            const bool lan = v == Verdict::LanOnly || v == Verdict::Partial;
+            e.overridden = (e.state == PortState::Allowed) != open ||
+                           (e.state == PortState::Lan && !lan && !open) ||
+                           (e.state == PortState::Blocked && (open || lan));
+        }
+    }
+    std::sort(out.begin(), out.end(), [](const PortEntry& a, const PortEntry& b) {
+        if (a.listening != b.listening) return a.listening; // listening first
+        if (a.port != b.port) return a.port < b.port;
+        return a.proto < b.proto;
+    });
+    return out;
+}
+
+void simulate_port_set(const State& state, const std::string& proto, int port, PortState target,
+                       std::vector<Rule>& after4, std::vector<Rule>& after6) {
+    after4.clear();
+    after6.clear();
+    for (const auto* list : {&state.rules4, &state.rules6}) {
+        for (const auto& r : *list) {
+            if (exact_open_rule(r, proto, port)) continue;
+            // live rules of LAN templates for this port go too
+            bool from_template = false;
+            for (const auto& t : state.templates) {
+                if (lan_template(t, proto, port) && r.mynet_id() == t.id) from_template = true;
+            }
+            if (from_template) continue;
+            (r.v6 ? after6 : after4).push_back(r);
+        }
+    }
+    const std::string act = is_ssh_port(state, proto, port) ? "limit" : "allow";
+    auto add = [&](const std::string& src, bool v6) {
+        Rule r;
+        r.action = act;
+        r.proto = proto;
+        r.dport = std::to_string(port);
+        r.dst = v6 ? "::/0" : "0.0.0.0/0";
+        r.sport = "any";
+        r.src = src;
+        r.direction = "in";
+        r.v6 = v6;
+        (v6 ? after6 : after4).push_back(r);
+    };
+    if (target == PortState::Allowed) {
+        add("0.0.0.0/0", false);
+        add("::/0", true);
+    }
+    else if (target == PortState::Lan) {
+        for (const auto& n : state.networks) {
+            if (!is_whitelisted(n, state.whitelist)) continue;
+            if (!n.subnet4.empty()) add(n.subnet4, false);
+            if (!n.subnet6.empty()) add(n.subnet6, true);
+        }
+    }
+}
+
 // ================================================================ networks
 
 bool is_whitelisted(const Network& net, const std::vector<WhitelistEntry>& whitelist) {

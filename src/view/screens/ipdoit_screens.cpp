@@ -320,30 +320,48 @@ void PortsScreen::build(lv_obj_t* column) {
 
 void PortsScreen::refresh() {
     auto& vm = view_model();
-    lv_label_set_text(header_, "Listening ports (ufw rules only)");
-    set_muted(header_);
+    const bool off = vm.loaded() && !vm.state().status.active;
+    lv_label_set_text(header_, off ? "Firewall off: everything listening is reachable"
+                                   : "ENTER: Blocked > LAN > Allowed   * other rule wins");
+    set_tone(header_, off ? kToneWarn : kToneMuted);
     std::vector<std::string> rows;
     std::vector<int> tones;
-    for (const auto& r : vm.port_rows()) {
-        rows.push_back(r.proto + " " + std::to_string(r.port) + "\t" +
-                       (r.process.empty() ? std::string("?") : r.process) + "\t" + r.summary());
-        const auto worst = r.v6 == fw::Verdict::NotApplicable ? r.v4 : r.v6;
-        tones.push_back(verdict_tone(r.v4 == fw::Verdict::NotApplicable ? worst : r.v4));
+    for (const auto& e : vm.port_entries()) {
+        std::string state = e.local_only ? "Local only" : fw::port_state_label(e.state);
+        if (e.overridden) state += " *";
+        const std::string who = e.listening ? (e.process.empty() ? std::string("?") : e.process)
+                                            : std::string("(not listening)");
+        rows.push_back(e.proto + " " + std::to_string(e.port) + "\t" + who + "\t" + state);
+        int tone = kToneNormal;
+        if (e.local_only || !e.listening) tone = kToneMuted;
+        else if (e.state == fw::PortState::Allowed) tone = kToneWarn;
+        else if (e.state == fw::PortState::Lan) tone = kToneNormal;
+        else tone = kToneGood;
+        tones.push_back(tone);
     }
     if (rows.empty()) {
         rows.push_back(vm.loaded() ? "Nothing is listening." : "Reading...");
         tones.push_back(kToneMuted);
     }
-    fill_list(list_, rows, -1, tones, {0, 70, 160});
+    fill_list(list_, rows, vm.port_entries().empty() ? -1 : vm.ports_index(), tones, {0, 70, 196});
 }
 
 bool PortsScreen::handle_key(uint32_t key) {
+    auto& vm = view_model();
     if (is_up(key)) {
-        lv_obj_scroll_by_bounded(list_, 0, 34, LV_ANIM_OFF);
+        vm.move_selection(-1);
         return true;
     }
     if (is_down(key)) {
-        lv_obj_scroll_by_bounded(list_, 0, -34, LV_ANIM_OFF);
+        vm.move_selection(1);
+        return true;
+    }
+    if (key == LV_KEY_ENTER || key == ' ') {
+        vm.toggle_selected_port();
+        return true;
+    }
+    if (key == 'u' || key == 'U') {
+        vm.undo();
         return true;
     }
     return handle_main_keys(key);

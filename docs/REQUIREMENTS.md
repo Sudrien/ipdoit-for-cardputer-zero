@@ -45,6 +45,15 @@ Keyboard-driven (46-key matrix).
   protocol, and direction in. IPv4 and IPv6 are judged separately, so a port can be
   allowed on one and blocked on the other.
 - Refreshed when the page opens and after every rule change.
+- **Merged list with a switch per port** (added after 0.1.4): the list also shows ports
+  that have rules but nothing listening (marked "not listening", listed last). Enter on a
+  port cycles its switch **Blocked > LAN > Allowed**:
+  - Blocked: no rule opens it (the default, since incoming is denied);
+  - LAN: a My network (whitelisted only) rule;
+  - Allowed: an allow rule from anywhere (`limit` for the SSH port).
+  A switch change applies at once with a toast and is one undo step (U). It only asks
+  first when it would lock out SSH. A `*` marks ports where another rule (a range, a
+  specific source) decides more than the switch shows. Local-only ports cannot be toggled.
 
 ### 5. My network (follows the device, with a network whitelist)
 - **Current subnet**: worked out without root from `ip -o addr show` and `ip route`.
@@ -98,6 +107,10 @@ Keyboard-driven (46-key matrix).
   - deleting the last rule that allows or limits the SSH port;
   - adding a deny or reject rule that covers the SSH port.
   If sshd is not running, no warning is shown.
+- **SSH exception**: SSH is allowed by default. When the firewall is turned on, and when
+  the package is installed, Ipdoit adds `limit <port>/tcp` (comment "ipdoit: SSH") for
+  each port sshd listens on (or, if sshd is enabled but not running, its configured port)
+  when nothing else lets it in. Everything else stays blocked by default.
 - **Undo last change**: before each rule change, back up `/etc/ufw/user.rules` and
   `/etc/ufw/user6.rules` into `/var/lib/ipdoit/backups/` (last 10 kept). Undo restores
   the most recent backup and runs `ufw reload`. Undo covers rules only: it never turns

@@ -99,6 +99,7 @@ public:
     const std::string& load_error() const { return load_error_; }
     const std::vector<RuleEntry>& rule_entries() const { return rule_entries_; }
     const std::vector<fw::PortRow>& port_rows() const { return port_rows_; }
+    const std::vector<fw::PortEntry>& port_entries() const { return port_entries_; }
     const std::vector<NetworkEntry>& network_entries() const { return network_entries_; }
     const fw::Network* current_network() const;
     bool current_network_whitelisted() const;
@@ -106,6 +107,7 @@ public:
     // ---- selections ----
     int rules_index() const { return rules_index_; }
     int networks_index() const { return networks_index_; }
+    int ports_index() const { return ports_index_; }
     void move_selection(int delta);
 
     // ---- actions (each opens the Confirm page) ----
@@ -114,6 +116,8 @@ public:
     void undo();
     void delete_selected_rule();
     void remove_selected_network();
+    // Ports page: Blocked -> LAN -> Allowed, applied at once (Confirm only for SSH lockout)
+    void toggle_selected_port();
     void refresh();
 
     // ---- add-rule form ----
@@ -172,6 +176,8 @@ private:
     std::string load_error_;
     std::vector<RuleEntry> rule_entries_;
     std::vector<fw::PortRow> port_rows_;
+    std::vector<fw::PortEntry> port_entries_;
+    int ports_index_ = 0;
     std::vector<NetworkEntry> network_entries_;
     int rules_index_ = 0;
     int networks_index_ = 0;

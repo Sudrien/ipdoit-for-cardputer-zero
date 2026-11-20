@@ -29,7 +29,7 @@ Hints hints_for(model::AppPage page) {
         case model::AppPage::Rules:
             return {{{"A", "Add"}, {"T", "Type"}, {"D", "Delete"}}};
         case model::AppPage::Ports:
-            return {{{"</>", "Pages"}, {"R", "Refresh"}, {nullptr, nullptr}}};
+            return {{{"</>", "Pages"}, {"ENTER", "Toggle"}, {"U", "Undo"}}};
         case model::AppPage::Networks:
             return {{{"</>", "Pages"}, {"ENTER", "Toggle"}, {"D", "Remove"}}};
         case model::AppPage::AddRule:

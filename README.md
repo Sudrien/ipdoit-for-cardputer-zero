@@ -15,12 +15,15 @@
 - **Rules**: the ufw rule list in match order; delete the selected rule; add rules with a
   form (presets for SSH, HTTP, HTTPS, DNS, mDNS) or by typing ufw syntax. Every new rule is
   checked with `ufw --dry-run` before it is applied.
-- **Ports**: what is listening (`ss -tulpn`) and whether UFW lets it in: Allowed, Limited,
-  LAN only, Partial, Blocked, Local only, or Firewall off; IPv4 and IPv6 separately.
+- **Ports**: everything listening (`ss -tulpn`) plus ports that only have rules, each with a
+  switch: Enter cycles **Blocked > LAN > Allowed** and applies at once (U undoes). Blocked is
+  the default; LAN is My network (whitelisted only); `*` means another rule decides more.
 - **My network** rules follow the device: they use the current subnet, and are rewritten
   when the network changes. Each is either *whitelisted only* (active only on networks you
   whitelisted, identified by gateway MAC) or *any network*.
-- **Safety**: every change is shown before it is applied; an SSH lockout guard warns
+- **SSH is allowed by default**: turning the firewall on, or installing the package, adds
+  `limit 22/tcp` (or sshd's port) if nothing else allows it.
+- **Safety**: rule changes are shown before they are applied; an SSH lockout guard warns
   (Enter twice to override) when a change would block sshd; Undo restores the rules from
   before the last change (it never turns the firewall on or off).
 - **sudo password** asked on launch, kept in memory only.
@@ -35,7 +38,7 @@ features.
 | all main pages | `Left`/`Right` switch pages, `R` refresh, `Esc` quit |
 | Status | `E` firewall on/off, `W` whitelist this network, `U` undo |
 | Rules | `Up`/`Down` select, `A`/`Enter` add with form, `T` type a rule, `D`/`Del` delete |
-| Ports | `Up`/`Down` scroll |
+| Ports | `Up`/`Down` select, `Enter` Blocked > LAN > Allowed, `U` undo |
 | Networks | `Up`/`Down` select, `Enter` toggle current network, `D` remove from whitelist |
 | Add rule | `Up`/`Down` field, `Left`/`Right` change choice, `1`-`5` preset, `Enter` check |
 | Confirm | `Enter` apply (twice when there is a warning), `Esc` cancel |

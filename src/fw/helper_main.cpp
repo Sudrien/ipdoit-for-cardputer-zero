@@ -17,6 +17,10 @@
 //   undo                                   restore the last backup
 //   sync                                   rewrite My network rules for the current network
 //   clear-mynet                            remove all live My network rules (uninstall)
+//   port-set <port> <tcp|udp|any> <blocked|lan|allowed>
+//                                          the Ports page switch (one undo step)
+//   ssh-allow                              add "limit <port>/tcp" for sshd if nothing
+//                                          allows it (run by enable and on install)
 
 #include "logic.h"
 #include "parse.h"
@@ -32,6 +36,7 @@
 #include <fcntl.h>
 #include <filesystem>
 #include <fstream>
+#include <set>
 #include <sstream>
 #include <sys/file.h>
 #include <sys/stat.h>
@@ -394,6 +399,135 @@ int cmd_clear_mynet() {
     return failures ? 1 : 0;
 }
 
+
+// Everything state needs for the logic functions, read directly as root.
+State read_state() {
+    State st;
+    std::string out;
+    ufw({"status", "verbose"}, out);
+    if (out.find("Default:") == std::string::npos) out += defaults_line() + "\n";
+    st.status = parse_status_verbose(out);
+    st.rules4 = parse_rules_file(read_file(kUserRules), false);
+    st.rules6 = parse_rules_file(read_file(kUserRules6), true);
+    run({"ss", "-H", "-tulpn"}, out);
+    st.sockets = parse_ss(out);
+    st.networks = current_networks();
+    st.whitelist = parse_whitelist(read_file(kWhitelist));
+    st.templates = parse_templates(read_file(kTemplates));
+    st.ok = true;
+    return st;
+}
+
+// SSH ports: what sshd listens on; if it is not running but is enabled, its configured
+// port (sshd -T), else 22.
+std::vector<int> ssh_ports(const State& st) {
+    std::vector<int> ports;
+    for (const auto& s : ssh_sockets(st.sockets)) {
+        if (std::find(ports.begin(), ports.end(), s.port) == ports.end()) ports.push_back(s.port);
+    }
+    if (!ports.empty()) return ports;
+    std::string out;
+    const bool enabled = run({"systemctl", "is-enabled", "ssh"}, out) == 0 ||
+                         run({"systemctl", "is-enabled", "sshd"}, out) == 0;
+    if (!enabled) return ports;
+    run({"sshd", "-T"}, out);
+    std::istringstream in(out);
+    std::string line;
+    while (std::getline(in, line)) {
+        if (line.rfind("port ", 0) == 0) ports.push_back(std::atoi(line.c_str() + 5));
+    }
+    if (ports.empty()) ports.push_back(22);
+    return ports;
+}
+
+// Add "limit <port>/tcp" for every SSH port the firewall would block once it is on.
+int ssh_allow(bool make_backup_first) {
+    const State st = read_state();
+    Status on = st.status;
+    on.active = true;
+    const auto subnets = local_subnets(st.networks);
+    std::vector<int> missing;
+    for (const int port : ssh_ports(st)) {
+        const bool v4 = verdict_reachable(evaluate(on, st.rules4, false, "tcp", port, "0.0.0.0", subnets));
+        if (!v4) missing.push_back(port);
+    }
+    if (missing.empty()) return 0;
+    if (make_backup_first) make_backup();
+    int rc = 0;
+    for (const int port : missing) {
+        std::printf("allowing SSH: limit %d/tcp\n", port);
+        if (ufw_print({"limit", std::to_string(port) + "/tcp", "comment", "ipdoit: SSH"}) != 0) rc = 1;
+    }
+    return rc;
+}
+
+int cmd_port_set(const std::vector<std::string>& a) {
+    if (a.size() != 3 || !valid_port(a[0]) || a[0].find_first_of(":,") != std::string::npos ||
+        !valid_proto(a[1]) || (a[2] != "blocked" && a[2] != "lan" && a[2] != "allowed")) {
+        std::fprintf(stderr, "usage: port-set <port> <tcp|udp|any> <blocked|lan|allowed>\n");
+        return 2;
+    }
+    const std::string port = a[0], proto = a[1], target = a[2];
+    const State st = read_state();
+    make_backup();
+    int rc = 0;
+    std::string out;
+    // 1. remove "from anywhere" allow/limit rules for exactly this port/protocol
+    std::set<std::string> actions;
+    for (const auto* list : {&st.rules4, &st.rules6}) {
+        for (const auto& r : *list) {
+            if (r.forward || r.direction != "in" || r.dport != port || r.proto != proto ||
+                !r.dapp.empty() || r.is_mynet() || !r.iface_in.empty() || r.sport != "any") continue;
+            if (r.action != "allow" && r.action != "limit") continue;
+            const Cidr src = Cidr::parse(r.src), dst = Cidr::parse(r.dst);
+            if ((src.valid && !src.is_any()) || (dst.valid && !dst.is_any())) continue;
+            actions.insert(r.action);
+        }
+    }
+    const std::string spec = proto == "any" ? port : port + "/" + proto;
+    for (const auto& act : actions) {
+        if (ufw({"delete", act, spec}, out) != 0) {
+            std::fprintf(stderr, "%s", out.c_str());
+            rc = 1;
+        }
+    }
+    // 2. remove LAN (whitelisted My network) templates for it
+    auto templates = parse_templates(read_file(kTemplates));
+    templates.erase(std::remove_if(templates.begin(), templates.end(),
+                                   [&](const Template& t) {
+                                       return (t.action == "allow" || t.action == "limit") &&
+                                              t.port == port && t.proto == proto &&
+                                              t.scope == "whitelisted";
+                                   }),
+                    templates.end());
+    // 3. add the new state
+    const std::string act = is_ssh_port(st, proto, std::atoi(port.c_str())) ? "limit" : "allow";
+    if (target == "allowed") {
+        if (ufw({act, spec}, out) != 0) {
+            std::fprintf(stderr, "%s", out.c_str());
+            rc = 1;
+        }
+    }
+    else if (target == "lan") {
+        Template t;
+        int next = 1;
+        for (const auto& x : templates) next = std::max(next, x.id + 1);
+        t.id = next;
+        t.action = act;
+        t.proto = proto;
+        t.port = port;
+        t.scope = "whitelisted";
+        templates.push_back(t);
+    }
+    if (!write_file(kTemplates, format_templates(templates))) {
+        std::fprintf(stderr, "error: cannot write %s\n", kTemplates);
+        return 1;
+    }
+    if (sync_mynet() != 0) rc = 1;
+    std::printf("port %s/%s: %s\n", port.c_str(), proto.c_str(), target.c_str());
+    return rc;
+}
+
 int cmd_undo() {
     const auto all = list_backups();
     if (all.empty()) {
@@ -455,7 +589,10 @@ int main(int argc, char** argv) {
         std::fprintf(stderr, "error: another firewall change is in progress\n");
         return 4;
     }
-    if (cmd == "enable") return ufw_print({"--force", "enable"});
+    if (cmd == "enable") {
+        ssh_allow(true); // SSH exception: never lock out an enabled sshd
+        return ufw_print({"--force", "enable"});
+    }
     if (cmd == "disable") return ufw_print({"disable"});
     if (cmd == "add") return cmd_add(args);
     if (cmd == "delete" && args.size() == 2) return cmd_delete(args[0], args[1]);
@@ -466,6 +603,8 @@ int main(int argc, char** argv) {
     if (cmd == "undo") return cmd_undo();
     if (cmd == "sync") return sync_mynet();
     if (cmd == "clear-mynet") return cmd_clear_mynet();
+    if (cmd == "port-set") return cmd_port_set(args);
+    if (cmd == "ssh-allow") return ssh_allow(true);
     std::fprintf(stderr, "unknown command: %s\n", cmd.c_str());
     return 2;
 }

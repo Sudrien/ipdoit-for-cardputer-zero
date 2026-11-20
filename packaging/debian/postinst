@@ -9,5 +9,8 @@ if [ "$1" = "configure" ]; then
     chmod 700 /var/lib/ipdoit
     # Bring My network rules in line with the current network (no-op on first install).
     /usr/libexec/ipdoit/ipdoit-helper sync >/dev/null 2>&1 || true
+    # SSH exception: if sshd is enabled and nothing allows it, add "limit <port>/tcp" now,
+    # so turning the firewall on later cannot lock out SSH.
+    /usr/libexec/ipdoit/ipdoit-helper ssh-allow >/dev/null 2>&1 || true
 fi
 exit 0

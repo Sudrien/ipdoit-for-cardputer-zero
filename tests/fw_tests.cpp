@@ -315,6 +315,42 @@ void test_ssh_guard() {
     CHECK(ssh_guard(st, st.status, {}, {}).empty());
 }
 
+void test_port_toggles() {
+    auto st = sample_state(true); // 22 allow any, 8080 LAN subnet rule, 9000 10/8, 631 local
+    st.templates = {{1, "allow", "tcp", "8080", "whitelisted", ""}};
+    st.rules4.push_back(parse_rules_file("### tuple ### allow tcp 3000 0.0.0.0/0 any 0.0.0.0/0 in\n", false)[0]);
+    CHECK(port_state(st, "tcp", 22) == PortState::Allowed);
+    CHECK(port_state(st, "tcp", 8080) == PortState::Lan);
+    CHECK(port_state(st, "tcp", 9000) == PortState::Blocked); // 10/8 only is not "LAN"
+    CHECK(port_state(st, "udp", 22) == PortState::Blocked);
+    CHECK(next_port_state(PortState::Blocked) == PortState::Lan);
+    CHECK(next_port_state(PortState::Lan) == PortState::Allowed);
+    CHECK(next_port_state(PortState::Allowed) == PortState::Blocked);
+
+    const auto entries = port_entries(st);
+    auto find = [&](int port) -> const PortEntry* {
+        for (const auto& e : entries) if (e.port == port) return &e;
+        return nullptr;
+    };
+    CHECK(find(22) && find(22)->listening && find(22)->process == "sshd");
+    CHECK(find(631) && find(631)->local_only);
+    CHECK(find(3000) && !find(3000)->listening && find(3000)->state == PortState::Allowed);
+    CHECK(entries.back().port == 3000); // not-listening ports go last
+    CHECK(find(9000)->overridden);      // blocked switch, but the 10/8 rule lets some in
+
+    CHECK(is_ssh_port(st, "tcp", 22) && !is_ssh_port(st, "tcp", 8080));
+    // blocking SSH removes its rule -> guard fires; allowing keeps it reachable
+    std::vector<Rule> a4, a6;
+    simulate_port_set(st, "tcp", 22, PortState::Blocked, a4, a6);
+    CHECK(!ssh_guard(st, st.status, a4, a6).empty());
+    simulate_port_set(st, "tcp", 22, PortState::Allowed, a4, a6);
+    CHECK(ssh_guard(st, st.status, a4, a6).empty());
+    CHECK(a4.back().action == "limit"); // SSH uses limit
+    // LAN on a non-whitelisted network blocks SSH too
+    simulate_port_set(st, "tcp", 22, PortState::Lan, a4, a6);
+    CHECK(!ssh_guard(st, st.status, a4, a6).empty());
+}
+
 } // namespace
 
 int main() {
@@ -329,6 +365,7 @@ int main() {
     test_mynet_sync();
     test_freeform_and_form();
     test_ssh_guard();
+    test_port_toggles();
     if (failures) {
         std::fprintf(stderr, "%d check(s) failed\n", failures);
         return 1;
