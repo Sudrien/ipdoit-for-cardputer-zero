@@ -1,6 +1,6 @@
 <p align="center">
   <img src="./screenshot/ipdoit-status.png" alt="Ipdoit status page" width="320" />
-  <img src="./screenshot/ipdoit-ports.png" alt="Ipdoit listening ports with firewall verdicts" width="320" />
+  <img src="./screenshot/ipdoit-ports.png" alt="Ipdoit ports with Blocked/LAN/Allowed switches" width="320" />
 </p>
 
 <div align="center">
@@ -92,6 +92,15 @@ takes the live My network rules out of ufw; purging also deletes `/etc/ipdoit` a
 backups.
 
 ## Screenshots
+
+| | |
+| --- | --- |
+| <img src="./screenshot/ipdoit-launcher-mockup.png" alt="Ipdoit in the launcher (mockup)" width="320" /> | <img src="./screenshot/ipdoit-status.png" alt="Status page" width="320" /> |
+| Launcher (mockup) | **Status**: on/off, defaults, network, whitelist |
+| <img src="./screenshot/ipdoit-rules.png" alt="Rules page" width="320" /> | <img src="./screenshot/ipdoit-ports.png" alt="Ports page" width="320" /> |
+| **Rules**: ufw rules in match order | **Ports**: Enter cycles Blocked, LAN, Allowed |
+| <img src="./screenshot/ipdoit-networks.png" alt="Networks page" width="320" /> | <img src="./screenshot/ipdoit-form.png" alt="Add rule form" width="320" /> |
+| **Networks**: current network and whitelist | **Add rule**: Tab changes values, 1-5 presets |
 
 The page screenshots come from the desktop simulator.
 `screenshot/ipdoit-launcher-mockup.png` is a mockup, not a capture: it places the Ipdoit
