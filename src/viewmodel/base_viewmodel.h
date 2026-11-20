@@ -83,6 +83,7 @@ public:
 
     // Left/Right on main pages; Esc on sub-pages.
     void next_page(int delta);
+    void show_main_page(int index); // 0..3: Status, Rules, Ports, Networks
     void back();
 
     // ---- password ----
@@ -155,6 +156,7 @@ public:
 
 private:
     void show_page(model::AppPage page);
+    void update_title(model::AppPage page);
     void bump();
     void notice(const std::string& text);
     void rebuild_views();

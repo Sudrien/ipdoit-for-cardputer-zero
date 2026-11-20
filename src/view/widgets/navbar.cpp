@@ -29,9 +29,9 @@ Hints hints_for(model::AppPage page) {
         case model::AppPage::Rules:
             return {{{"A", "Add"}, {"T", "Type"}, {"D", "Delete"}}};
         case model::AppPage::Ports:
-            return {{{"</>", "Pages"}, {"ENTER", "Toggle"}, {"U", "Undo"}}};
+            return {{{"ENTER", "Toggle"}, {"U", "Undo"}, {nullptr, nullptr}}};
         case model::AppPage::Networks:
-            return {{{"</>", "Pages"}, {"ENTER", "Toggle"}, {"D", "Remove"}}};
+            return {{{"ENTER", "Toggle"}, {"D", "Remove"}, {nullptr, nullptr}}};
         case model::AppPage::AddRule:
             return {{{"ESC", "Back"}, {"</>", "Change"}, {"ENTER", "Check"}}};
         case model::AppPage::FreeForm:
@@ -70,6 +70,32 @@ void NavBar::build() {
     const lv_font_t* key_font = assets_.load_standard_font(14);
     const lv_font_t* text_font = assets_.load_standard_font(14, app::StandardFontWeight::Regular);
 
+    // Page indicator on the main pages: red filled triangles like the arrow labels printed
+    // on the Z and C keys, then the page number: "<| / |> (3)".
+    page_nav_ = lv_obj_create(core_obj_);
+    lv_obj_remove_style_all(page_nav_);
+    lv_obj_set_size(page_nav_, LV_SIZE_CONTENT, LV_PCT(100));
+    lv_obj_set_flex_flow(page_nav_, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(page_nav_, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_column(page_nav_, 3, 0);
+    lv_obj_clear_flag(page_nav_, LV_OBJ_FLAG_SCROLLABLE);
+    for (int dir = 0; dir < 2; ++dir) {
+        if (dir == 1) {
+            auto* slash = lv_label_create(page_nav_);
+            lv_label_set_text(slash, "/");
+            lv_obj_set_style_text_font(slash, text_font ? text_font : &lv_font_montserrat_14, 0);
+            reactive::bind_theme(slash, view_model_.dark_mode_subject(), reactive::ThemeRole::Text);
+        }
+        auto* tri = lv_obj_create(page_nav_);
+        lv_obj_remove_style_all(tri);
+        lv_obj_set_size(tri, 8, 11);
+        lv_obj_add_event_cb(tri, triangle_draw_cb, LV_EVENT_DRAW_MAIN,
+                            reinterpret_cast<void*>(static_cast<intptr_t>(dir)));
+    }
+    page_number_ = lv_label_create(page_nav_);
+    lv_obj_set_style_text_font(page_number_, text_font ? text_font : &lv_font_montserrat_14, 0);
+    reactive::bind_theme(page_number_, view_model_.dark_mode_subject(), reactive::ThemeRole::Text);
+
     for (std::size_t i = 0; i < kMaxHints; ++i) {
         auto* item = lv_obj_create(core_obj_);
         lv_obj_remove_style_all(item);
@@ -95,7 +121,44 @@ void NavBar::build() {
     update_hints();
 }
 
+// Filled red triangle pointing left (user data 0) or right (1).
+void NavBar::triangle_draw_cb(lv_event_t* e) {
+    auto* obj = static_cast<lv_obj_t*>(lv_event_get_target(e));
+    const bool right = reinterpret_cast<intptr_t>(lv_event_get_user_data(e)) != 0;
+    lv_area_t a;
+    lv_obj_get_coords(obj, &a);
+    lv_draw_triangle_dsc_t dsc;
+    lv_draw_triangle_dsc_init(&dsc);
+    dsc.color = lv_color_hex(0xF0502A); // the orange-red of the key labels
+    dsc.opa = LV_OPA_COVER;
+    const int32_t mid = (a.y1 + a.y2) / 2;
+    if (right) {
+        dsc.p[0] = {a.x1, a.y1};
+        dsc.p[1] = {a.x1, a.y2};
+        dsc.p[2] = {a.x2, mid};
+    }
+    else {
+        dsc.p[0] = {a.x2, a.y1};
+        dsc.p[1] = {a.x2, a.y2};
+        dsc.p[2] = {a.x1, mid};
+    }
+    lv_draw_triangle(lv_event_get_layer(e), &dsc);
+}
+
 void NavBar::update_hints() {
+    const auto page = view_model_.current_page();
+    int index = -1;
+    for (int i = 0; i < model::kMainPageCount; ++i) {
+        if (model::kMainPages[i] == page) index = i;
+    }
+    if (index < 0) {
+        lv_obj_add_flag(page_nav_, LV_OBJ_FLAG_HIDDEN);
+    }
+    else {
+        lv_obj_remove_flag(page_nav_, LV_OBJ_FLAG_HIDDEN);
+        lv_label_set_text_fmt(page_number_, "(%d)", index + 1);
+    }
+
     const auto hints = hints_for(view_model_.current_page());
     const auto colors = view::palette(view_model_.is_dark_mode());
     for (std::size_t i = 0; i < kMaxHints; ++i) {

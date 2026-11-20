@@ -34,19 +34,19 @@ PageHelp help_for(model::AppPage page) {
                                   {"ESC", "Quit"}}}, 3};
         case model::AppPage::Status:
             return {"STATUS", {{{"E", "Firewall on/off"}, {"W", "Whitelist this network"},
-                                {"U", "Undo last rule change"}, {"< / >", "Other pages"},
+                                {"U", "Undo last rule change"}, {"< > or 1-4", "Other pages"},
                                 {"R", "Refresh"}}}, 5};
         case model::AppPage::Rules:
             return {"RULES", {{{"UP / DOWN", "Select"}, {"A / ENTER", "Add with form"},
                                {"T", "Type a ufw rule"}, {"D / DEL", "Delete selected"},
-                               {"< / >", "Other pages"}}}, 5};
+                               {"< > or 1-4", "Other pages"}}}, 5};
         case model::AppPage::Ports:
             return {"PORTS", {{{"UP / DOWN", "Select"}, {"ENTER", "Blocked/LAN/Allowed"},
-                               {"U", "Undo"}, {"R", "Refresh"}, {"< / >", "Other pages"}}}, 5};
+                               {"U", "Undo"}, {"R", "Refresh"}, {"< > or 1-4", "Other pages"}}}, 5};
         case model::AppPage::Networks:
             return {"NETWORKS", {{{"UP / DOWN", "Select"}, {"ENTER", "Toggle current"},
                                   {"D / DEL", "Remove from whitelist"},
-                                  {"< / >", "Other pages"}}}, 4};
+                                  {"< > or 1-4", "Other pages"}}}, 4};
         case model::AppPage::AddRule:
             return {"ADD RULE", {{{"UP / DOWN", "Field"}, {"< / >", "Change choice"},
                                   {"1 - 5", "Preset (on a choice)"}, {"ENTER", "Check rule"},

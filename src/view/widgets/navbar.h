@@ -30,6 +30,10 @@ private:
 
     void update_hints();
     static void update_cb(lv_observer_t* observer, lv_subject_t* subject);
+    static void triangle_draw_cb(lv_event_t* e);
+
+    lv_obj_t* page_nav_{nullptr};    // "<| / |> (n)" on the main pages
+    lv_obj_t* page_number_{nullptr};
 
     viewmodel::BaseViewModel& view_model_;
     app::AssetManager& assets_;

@@ -283,8 +283,26 @@ bool BaseViewModel::busy() const {
 }
 
 void BaseViewModel::show_page(AppPage page) {
+    update_title(page);
     model_.set_current_page(page);
     current_page_subject_.set(static_cast<int>(page));
+}
+
+// Title: "Ipdoit  Ports" on the main pages (the footer shows "<| / |> (3)"), just "Ipdoit"
+// elsewhere.
+void BaseViewModel::update_title(AppPage page) {
+    static const char* const kNames[] = {"Status", "Rules", "Ports", "Networks"};
+    std::string title = model_.app_title();
+    for (int i = 0; i < model::kMainPageCount; ++i) {
+        if (model::kMainPages[i] == page) title += std::string("  ") + kNames[i];
+    }
+    title_subject_.set(title.c_str());
+}
+
+void BaseViewModel::show_main_page(int index) {
+    if (index >= 0 && index < model::kMainPageCount) {
+        show_page(model::kMainPages[index]);
+    }
 }
 
 void BaseViewModel::bump() {

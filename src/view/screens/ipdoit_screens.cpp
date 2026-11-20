@@ -163,6 +163,10 @@ bool IpdoitScreen::handle_main_keys(uint32_t key) {
         vm.refresh();
         return true;
     }
+    if (key >= '1' && key <= '4') { // jump straight to a main page
+        vm.show_main_page(static_cast<int>(key - '1'));
+        return true;
+    }
     if (key == LV_KEY_ESC) {
         vm.back();
         return true;
