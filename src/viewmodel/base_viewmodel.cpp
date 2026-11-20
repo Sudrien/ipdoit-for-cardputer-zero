@@ -345,6 +345,7 @@ void BaseViewModel::back() {
             }
             {
                 const auto back_to = pending_.return_page;
+                if (pending_.is_nm_hook_offer) nm_hook_declined_ = true;
                 pending_ = PendingChange{};
                 show_page(back_to);
             }
@@ -508,6 +509,9 @@ void BaseViewModel::toggle_whitelist() {
         c.helper_args = {"whitelist-add", n->key(), n->subnet4, n->iface + " " + n->subnet4};
         c.note = "\"Whitelisted only\" My network rules will apply here. A gateway MAC can be "
                  "copied, so this is a convenience, not strong security.";
+        for (const auto& t : state_.templates) {
+            if (t.scope == "whitelisted") c.offer_nm_hook = true;
+        }
     }
     open_confirm(std::move(c));
 }
@@ -755,6 +759,7 @@ void BaseViewModel::form_submit() {
         auto t = fw::form_template(form_);
         c.command = fw::describe_template(t);
         c.helper_args = {"mynet-add", t.action, t.proto, t.port, t.scope};
+        c.offer_nm_hook = t.scope == "whitelisted";
         if (!t.comment.empty()) c.helper_args.push_back(t.comment);
         // simulate the live rules this would add right now
         auto after4 = state_.rules4;
@@ -874,7 +879,12 @@ void BaseViewModel::finish_apply(const FirewallService::Result& result) {
     const auto back_to = pending_.return_page;
     if (result.ok) {
         notice(pending_.title + (back_to == AppPage::Ports ? "  (U undo)" : ": done"));
+        const bool offer = pending_.offer_nm_hook;
         pending_ = PendingChange{};
+        if (offer && should_offer_nm_hook()) {
+            offer_nm_hook(back_to);
+            return;
+        }
         show_page(back_to);
     }
     else {
@@ -883,6 +893,25 @@ void BaseViewModel::finish_apply(const FirewallService::Result& result) {
         show_message(title, result.output.empty() ? "ipdoit-helper failed" : result.output,
                      back_to);
     }
+}
+
+// "Whitelisted only" rules only follow the network if something re-syncs them when it
+// changes. Offer the NetworkManager hook right after a change that relies on it.
+bool BaseViewModel::should_offer_nm_hook() const {
+    return state_.nm_hook == 0 && !nm_hook_declined_;
+}
+
+void BaseViewModel::offer_nm_hook(AppPage return_page) {
+    PendingChange c;
+    c.return_page = return_page;
+    c.is_nm_hook_offer = true;
+    c.title = "Follow network changes?";
+    c.command = "link nm-dispatcher into\n/etc/NetworkManager/dispatcher.d";
+    c.helper_args = {"nm-hook-on"};
+    c.note = "\"Whitelisted only\" rules are only updated while Ipdoit is open. If you leave "
+             "this network, they stay open until you open Ipdoit again. Enter lets "
+             "NetworkManager re-sync them on every network change. Esc: not now.";
+    open_confirm(std::move(c));
 }
 
 } // namespace viewmodel

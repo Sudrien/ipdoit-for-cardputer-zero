@@ -366,6 +366,11 @@ int main() {
     test_freeform_and_form();
     test_ssh_guard();
     test_port_toggles();
+    {
+        CHECK(parse_state("@status\nStatus: inactive\n").nm_hook == -1);
+        CHECK(parse_state("@status\nStatus: inactive\n@nmhook\n0\n").nm_hook == 0);
+        CHECK(parse_state("@status\nStatus: inactive\n@nmhook\n1\n").nm_hook == 1);
+    }
     if (failures) {
         std::fprintf(stderr, "%d check(s) failed\n", failures);
         return 1;

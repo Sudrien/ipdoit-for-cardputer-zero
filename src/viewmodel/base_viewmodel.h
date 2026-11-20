@@ -50,6 +50,8 @@ struct PendingChange {
     std::string note;                     // extra line (dry-run summary, "cannot preview")
     std::string warning;                  // SSH lockout warning, empty if none
     bool acknowledged = false;            // warning seen once, Enter again applies
+    bool offer_nm_hook = false;           // after success, offer the NetworkManager hook
+    bool is_nm_hook_offer = false;        // this is that offer (Esc = not this session)
     Phase phase = Phase::Ready;
     model::AppPage return_page = model::AppPage::Status;
     uint32_t request = 0;                 // service request being waited on
@@ -161,6 +163,8 @@ private:
     void notice(const std::string& text);
     void rebuild_views();
     void open_confirm(PendingChange change);
+    bool should_offer_nm_hook() const;
+    void offer_nm_hook(model::AppPage return_page);
     void finish_dry_run(const fw::FirewallService::Result& result);
     void finish_apply(const fw::FirewallService::Result& result);
     void show_message(const std::string& title, const std::string& text,
@@ -192,6 +196,7 @@ private:
     std::string freeform_error_;
 
     PendingChange pending_;
+    bool nm_hook_declined_ = false; // "not now" on the hook offer, until Ipdoit restarts
 
     std::string message_title_;
     std::string message_text_;

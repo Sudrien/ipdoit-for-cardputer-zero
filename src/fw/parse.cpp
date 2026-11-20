@@ -550,6 +550,7 @@ State parse_state(const std::string& text) {
     st.whitelist = parse_whitelist(sections["whitelist"]);
     st.templates = parse_templates(sections["templates"]);
     st.backups = std::atoi(trim(sections["backups"]).c_str());
+    st.nm_hook = sections.count("nmhook") ? std::atoi(trim(sections["nmhook"]).c_str()) : -1;
     st.ok = true;
     return st;
 }

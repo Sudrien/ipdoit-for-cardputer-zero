@@ -77,19 +77,17 @@ ipdoit-helper sync
 ipdoit-helper undo
 ```
 
-## Optional: follow network changes automatically
+## Following network changes
 
 The app store does not let packages install into NetworkManager's own directories, so
-the dispatcher hook ships inactive. To have My network rules re-synced whenever a
-connection comes up, goes down or changes address (even with the app closed):
+the dispatcher hook ships inactive. When you add a "My network (whitelisted only)" rule,
+or whitelist a network while such rules exist, Ipdoit asks **Follow network changes?**
+Enter links the hook into `/etc/NetworkManager/dispatcher.d/`, so the rules are
+re-synced whenever a connection comes up, goes down or changes address, even with the
+app closed. Esc skips it until Ipdoit is next started.
 
-```shell
-sudo ln -s /usr/lib/ipdoit-for-cardputer-zero/nm-dispatcher \
-    /etc/NetworkManager/dispatcher.d/90-ipdoit-for-cardputer-zero
-```
-
-Without it, "My network (whitelisted only)" rules stay as they were until Ipdoit is next
-opened. Removing the package deletes the link.
+Without the hook, whitelisted-only rules stay as they were until Ipdoit is next opened.
+Over SSH: `ipdoit-helper nm-hook-on` / `nm-hook-off`. Removing the package deletes the link.
 
 ## Installed files
 

@@ -80,8 +80,9 @@ Keyboard-driven (46-key matrix).
   `/etc/ipdoit-for-cardputer-zero/mynet-rules.conf` (action, port, protocol, scope). The ufw rules made from
   them carry a comment tag (`ipdoit:mynet:<id>`), so they can be found and replaced.
   An optional NetworkManager dispatcher script (shipped as
-  `/usr/lib/ipdoit-for-cardputer-zero/nm-dispatcher`, enabled by the user linking it into
-  `/etc/NetworkManager/dispatcher.d/`; the store rejects `usr/lib/NetworkManager/`), run as root by NetworkManager whenever a connection comes up, goes down or gets a new
+  `/usr/lib/ipdoit-for-cardputer-zero/nm-dispatcher`, linked into `/etc/NetworkManager/dispatcher.d/`
+  by `ipdoit-helper nm-hook-on` when the user accepts the "Follow network changes?"
+  prompt shown after adding a whitelisted-only rule or whitelisting a network; the store rejects `usr/lib/NetworkManager/`), run as root by NetworkManager whenever a connection comes up, goes down or gets a new
   address, deletes the tagged rules and re-adds them for the current subnet(s) and
   whitelist. Ipdoit does the same when it opens, in case an event was missed.
 - These automatic rewrites are not undoable changes; undo covers rule changes made in

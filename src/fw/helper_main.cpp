@@ -21,6 +21,8 @@
 //                                          the Ports page switch (one undo step)
 //   ssh-allow                              add "limit <port>/tcp" for sshd if nothing
 //                                          allows it (run by enable and on install)
+//   nm-hook-on | nm-hook-off               link / unlink the NetworkManager dispatcher hook
+//                                          (re-syncs My network rules on network changes)
 
 #include "logic.h"
 #include "parse.h"
@@ -56,6 +58,11 @@ const char* kWhitelist = "/etc/ipdoit-for-cardputer-zero/whitelist.conf";
 const char* kTemplates = "/etc/ipdoit-for-cardputer-zero/mynet-rules.conf";
 const char* kBackupDir = "/var/lib/ipdoit-for-cardputer-zero/backups";
 const char* kLock = "/run/ipdoit-for-cardputer-zero.lock";
+// The package ships the hook inactive (the store forbids usr/lib/NetworkManager); the user
+// opts in from the app, which links it here. prerm removes the link.
+const char* kNmDispatchDir = "/etc/NetworkManager/dispatcher.d";
+const char* kNmHookLink = "/etc/NetworkManager/dispatcher.d/90-ipdoit-for-cardputer-zero";
+const char* kNmHookTarget = "/usr/lib/ipdoit-for-cardputer-zero/nm-dispatcher";
 constexpr size_t kKeepBackups = 10;
 
 std::string read_file(const std::string& path) {
@@ -248,6 +255,48 @@ std::string tuples_only(const std::string& text) {
     return out;
 }
 
+// 1 linked, 0 not linked, -1 NetworkManager not installed
+int nm_hook_state() {
+    std::error_code ec;
+    if (!fs::is_directory(kNmDispatchDir, ec)) return -1;
+    const auto target = fs::read_symlink(kNmHookLink, ec);
+    return (!ec && target == kNmHookTarget) ? 1 : 0;
+}
+
+int cmd_nm_hook(bool on) {
+    std::error_code ec;
+    const int st = nm_hook_state();
+    if (!on) {
+        if (st == 1) fs::remove(kNmHookLink, ec);
+        if (ec) {
+            std::fprintf(stderr, "error: cannot remove %s: %s\n", kNmHookLink,
+                         ec.message().c_str());
+            return 1;
+        }
+        std::printf("NetworkManager hook off\n");
+        return 0;
+    }
+    if (st < 0) {
+        std::fprintf(stderr, "error: NetworkManager not found (%s missing)\n", kNmDispatchDir);
+        return 1;
+    }
+    if (st == 0) {
+        if (fs::symlink_status(kNmHookLink, ec).type() != fs::file_type::not_found) {
+            // never replace a file we did not make
+            std::fprintf(stderr, "error: %s exists and is not Ipdoit's link\n", kNmHookLink);
+            return 1;
+        }
+        fs::create_symlink(kNmHookTarget, kNmHookLink, ec);
+        if (ec) {
+            std::fprintf(stderr, "error: cannot link %s: %s\n", kNmHookLink,
+                         ec.message().c_str());
+            return 1;
+        }
+    }
+    std::printf("NetworkManager hook on\n");
+    return sync_mynet();
+}
+
 int cmd_state() {
     std::string out;
     ufw({"status", "verbose"}, out);
@@ -268,6 +317,7 @@ int cmd_state() {
     std::printf("@whitelist\n%s", read_file(kWhitelist).c_str());
     std::printf("@templates\n%s", read_file(kTemplates).c_str());
     std::printf("@backups\n%zu\n", list_backups().size());
+    std::printf("@nmhook\n%d\n", nm_hook_state());
     return 0;
 }
 
@@ -605,6 +655,8 @@ int main(int argc, char** argv) {
     if (cmd == "clear-mynet") return cmd_clear_mynet();
     if (cmd == "port-set") return cmd_port_set(args);
     if (cmd == "ssh-allow") return ssh_allow(true);
+    if (cmd == "nm-hook-on") return cmd_nm_hook(true);
+    if (cmd == "nm-hook-off") return cmd_nm_hook(false);
     std::fprintf(stderr, "unknown command: %s\n", cmd.c_str());
     return 2;
 }

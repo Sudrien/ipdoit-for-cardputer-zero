@@ -85,6 +85,7 @@ struct State {
     std::vector<WhitelistEntry> whitelist;
     std::vector<Template> templates;
     int backups = 0;
+    int nm_hook = -1; // NetworkManager hook: 1 linked, 0 not linked, -1 no NetworkManager
 };
 
 } // namespace fw
