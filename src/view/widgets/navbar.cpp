@@ -33,7 +33,7 @@ Hints hints_for(model::AppPage page) {
         case model::AppPage::Networks:
             return {{{"ENTER", "Toggle"}, {"D", "Remove"}, {nullptr, nullptr}}};
         case model::AppPage::AddRule:
-            return {{{"ESC", "Back"}, {"</>", "Change"}, {"ENTER", "Check"}}};
+            return {{{"ESC", "Back"}, {"TAB", "Change"}, {"ENTER", "Check"}}};
         case model::AppPage::FreeForm:
             return {{{"ESC", "Back"}, {"ENTER", "Check"}, {nullptr, nullptr}}};
         case model::AppPage::Confirm:

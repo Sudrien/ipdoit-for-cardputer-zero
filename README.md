@@ -40,7 +40,7 @@ features.
 | Rules | `Up`/`Down` select, `A`/`Enter` add with form, `T` type a rule, `D`/`Del` delete |
 | Ports | `Up`/`Down` select, `Enter` Blocked > LAN > Allowed, `U` undo |
 | Networks | `Up`/`Down` select, `Enter` toggle current network, `D` remove from whitelist |
-| Add rule | `Up`/`Down` field, `Left`/`Right` change choice, `1`-`5` preset, `Enter` check |
+| Add rule | `Up`/`Down` field, `Tab`/`Shift`+`Tab` change choice (on a text field: next field), `1`-`5` preset, `Enter` check |
 | Confirm | `Enter` apply (twice when there is a warning), `Esc` cancel |
 
 `Fn`+`H` shows help for the current page. Hold `Esc` to quit.

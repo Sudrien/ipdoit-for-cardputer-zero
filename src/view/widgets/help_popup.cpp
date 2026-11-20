@@ -48,7 +48,7 @@ PageHelp help_for(model::AppPage page) {
                                   {"D / DEL", "Remove from whitelist"},
                                   {"< > or 1-4", "Other pages"}}}, 4};
         case model::AppPage::AddRule:
-            return {"ADD RULE", {{{"UP / DOWN", "Field"}, {"< / >", "Change choice"},
+            return {"ADD RULE", {{{"UP / DOWN", "Field"}, {"TAB / S-TAB", "Change choice"},
                                   {"1 - 5", "Preset (on a choice)"}, {"ENTER", "Check rule"},
                                   {"ESC", "Back"}}}, 5};
         case model::AppPage::FreeForm:

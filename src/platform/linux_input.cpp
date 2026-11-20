@@ -218,6 +218,8 @@ uint32_t map_evdev_key(uint16_t code, bool shift) {
             return LV_KEY_PREV;
         case KEY_PAGEDOWN:
             return LV_KEY_NEXT;
+        case KEY_TAB: // Tab = next, Shift+Tab = previous (LVGL's SDL driver does the same)
+            return shift ? LV_KEY_PREV : LV_KEY_NEXT;
         case KEY_SYSRQ:
             return kKeyPrintScreen;
         case KEY_HELP:

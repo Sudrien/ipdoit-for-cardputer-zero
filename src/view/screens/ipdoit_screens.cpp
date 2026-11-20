@@ -449,7 +449,7 @@ void AddRuleScreen::refresh() {
         set_tone(footer_, kToneBad);
     }
     else {
-        lv_label_set_text(footer_, "Presets on a < > field: 1 SSH 2 HTTP 3 HTTPS 4 DNS 5 mDNS");
+        lv_label_set_text(footer_, "TAB changes < >. Presets: 1 SSH 2 HTTP 3 HTTPS 4 DNS 5 mDNS");
         set_muted(footer_);
     }
 }
@@ -464,11 +464,13 @@ bool AddRuleScreen::handle_key(uint32_t key) {
         case LV_KEY_DOWN:
             vm.form_move(1);
             return true;
-        case LV_KEY_LEFT:
-            vm.form_cycle(-1);
+        case LV_KEY_NEXT: // Tab: next value on a choice field, next field on a text field
+            if (text_field) vm.form_move(1);
+            else vm.form_cycle(1);
             return true;
-        case LV_KEY_RIGHT:
-            vm.form_cycle(1);
+        case LV_KEY_PREV: // Shift+Tab
+            if (text_field) vm.form_move(-1);
+            else vm.form_cycle(-1);
             return true;
         case LV_KEY_ENTER:
             vm.form_submit();
@@ -483,11 +485,9 @@ bool AddRuleScreen::handle_key(uint32_t key) {
             break;
     }
     if (!text_field) {
-        // Letter arrows (F X Z C) and presets on choice fields
+        // Letter arrows (F X) and presets on choice fields; values change with Tab
         if (is_up(key)) { vm.form_move(-1); return true; }
         if (is_down(key)) { vm.form_move(1); return true; }
-        if (is_left(key)) { vm.form_cycle(-1); return true; }
-        if (is_right(key) || key == ' ') { vm.form_cycle(1); return true; }
         if (key >= '1' && key <= '5') { vm.form_apply_preset(static_cast<int>(key - '1')); return true; }
         return true;
     }
