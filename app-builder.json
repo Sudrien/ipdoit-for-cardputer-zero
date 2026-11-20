@@ -1,7 +1,7 @@
 {
   "app_name": "Ipdoit",
   "package_name": "ipdoit-for-cardputer-zero",
-  "version": "0.1.1",
+  "version": "0.1.4",
   "description": "UFW firewall manager for CardputerZero",
 
   "store": {
