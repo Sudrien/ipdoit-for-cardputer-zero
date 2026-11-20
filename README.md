@@ -88,6 +88,16 @@ Depends on `ufw`, `sudo` and `iproute2`. There is no systemd service. Removing t
 takes the live My network rules out of ufw; purging also deletes `/etc/ipdoit` and the
 backups.
 
+## Screenshots
+
+The page screenshots come from the desktop simulator.
+`screenshot/ipdoit-launcher-mockup.png` is a mockup, not a capture: it places the Ipdoit
+icon on the launcher home screen using the carousel geometry from
+[CardputerZero/launcher](https://github.com/CardputerZero/launcher)'s source. The Store icon
+and carousel arrows in it are that project's assets (MIT, Copyright (c) 2026 M5Stack
+Technology CO LTD). The launcher's top bar is left blank, and the titles use DejaVu Sans
+Bold rather than the launcher's Montserrat.
+
 ## Status
 
 Tested on an Ubuntu 24.04 amd64 host with a live ufw (IPv4; the sandbox had no IPv6) and a
