@@ -415,7 +415,7 @@ By default, the debian package is copied to '$HOME' folder, normally it's under 
 On your device, install the copied package with `apt` and replace the package file name with the one you copied:
 
 ```shell
-sudo apt install --no-install-recommends ./ipdoit-for-cardputer-zero_<version>-rev1_arm64.deb
+sudo apt install --no-install-recommends ./ipdoit-for-cardputer-zero_v<version>_arm64.deb
 ```
 
 
@@ -464,13 +464,13 @@ cmake --preset darwin-arm64 -DAPP_ASSETS_ROOT=/path/to/assets
 Debian packages are produced with CPack and written to `dist/`. The package file name follows:
 
 ```text
-<AppName>_<Version>_<Revision>_arm64.deb
+<package-name>_v<Version>_arm64.deb
 ```
 
 Default example:
 
 ```text
-dist/ipdoit-for-cardputer-zero_<version>-rev1_arm64.deb
+dist/ipdoit-for-cardputer-zero_v<version>_arm64.deb
 ```
 
 Package layout:
