@@ -20,10 +20,12 @@ constexpr int kToneBad = 2;
 constexpr int kToneWarn = 3;
 constexpr int kToneMuted = 4;
 
-bool is_up(uint32_t key) { return key == LV_KEY_UP || key == ';'; }
-bool is_down(uint32_t key) { return key == LV_KEY_DOWN || key == '.'; }
-bool is_left(uint32_t key) { return key == LV_KEY_LEFT || key == ','; }
-bool is_right(uint32_t key) { return key == LV_KEY_RIGHT || key == '/'; }
+// Arrows as labelled on the CardputerZero keys: F up, X down, Z left, C right
+// (plain, or with fn, which the keyboard sends as real arrow keys).
+bool is_up(uint32_t key) { return key == LV_KEY_UP || key == 'f' || key == 'F'; }
+bool is_down(uint32_t key) { return key == LV_KEY_DOWN || key == 'x' || key == 'X'; }
+bool is_left(uint32_t key) { return key == LV_KEY_LEFT || key == 'z' || key == 'Z'; }
+bool is_right(uint32_t key) { return key == LV_KEY_RIGHT || key == 'c' || key == 'C'; }
 bool is_delete(uint32_t key) {
     return key == 'd' || key == 'D' || key == LV_KEY_DEL || key == LV_KEY_BACKSPACE;
 }
@@ -301,7 +303,7 @@ bool RulesScreen::handle_key(uint32_t key) {
         vm.open_add_rule();
         return true;
     }
-    if (key == 'f' || key == 'F') {
+    if (key == 't' || key == 'T') {
         vm.open_freeform();
         return true;
     }
@@ -459,11 +461,11 @@ bool AddRuleScreen::handle_key(uint32_t key) {
             break;
     }
     if (!text_field) {
-        // Cardputer arrows without fn, and presets
-        if (key == ';') { vm.form_move(-1); return true; }
-        if (key == '.') { vm.form_move(1); return true; }
-        if (key == ',') { vm.form_cycle(-1); return true; }
-        if (key == '/' || key == ' ') { vm.form_cycle(1); return true; }
+        // Letter arrows (F X Z C) and presets on choice fields
+        if (is_up(key)) { vm.form_move(-1); return true; }
+        if (is_down(key)) { vm.form_move(1); return true; }
+        if (is_left(key)) { vm.form_cycle(-1); return true; }
+        if (is_right(key) || key == ' ') { vm.form_cycle(1); return true; }
         if (key >= '1' && key <= '5') { vm.form_apply_preset(static_cast<int>(key - '1')); return true; }
         return true;
     }

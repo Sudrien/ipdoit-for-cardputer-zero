@@ -38,7 +38,7 @@ PageHelp help_for(model::AppPage page) {
                                 {"R", "Refresh"}}}, 5};
         case model::AppPage::Rules:
             return {"RULES", {{{"UP / DOWN", "Select"}, {"A / ENTER", "Add with form"},
-                               {"F", "Type a ufw rule"}, {"D / DEL", "Delete selected"},
+                               {"T", "Type a ufw rule"}, {"D / DEL", "Delete selected"},
                                {"< / >", "Other pages"}}}, 5};
         case model::AppPage::Ports:
             return {"PORTS", {{{"UP / DOWN", "Scroll"}, {"R", "Refresh"},

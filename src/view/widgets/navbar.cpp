@@ -27,7 +27,7 @@ Hints hints_for(model::AppPage page) {
         case model::AppPage::Status:
             return {{{"E", "On/Off"}, {"W", "Whitelist"}, {"U", "Undo"}}};
         case model::AppPage::Rules:
-            return {{{"A", "Add"}, {"F", "Type"}, {"D", "Delete"}}};
+            return {{{"A", "Add"}, {"T", "Type"}, {"D", "Delete"}}};
         case model::AppPage::Ports:
             return {{{"</>", "Pages"}, {"R", "Refresh"}, {nullptr, nullptr}}};
         case model::AppPage::Networks:

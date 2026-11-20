@@ -34,7 +34,7 @@ features.
 | --- | --- |
 | all main pages | `Left`/`Right` switch pages, `R` refresh, `Esc` quit |
 | Status | `E` firewall on/off, `W` whitelist this network, `U` undo |
-| Rules | `Up`/`Down` select, `A`/`Enter` add with form, `F` type a rule, `D`/`Del` delete |
+| Rules | `Up`/`Down` select, `A`/`Enter` add with form, `T` type a rule, `D`/`Del` delete |
 | Ports | `Up`/`Down` scroll |
 | Networks | `Up`/`Down` select, `Enter` toggle current network, `D` remove from whitelist |
 | Add rule | `Up`/`Down` field, `Left`/`Right` change choice, `1`-`5` preset, `Enter` check |
