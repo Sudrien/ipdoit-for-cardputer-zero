@@ -31,7 +31,8 @@
 /* Memory size */
 #define LV_MEM_SIZE                        (16U * 1024U * 1024U)
 
-#define LV_DRAW_THREAD_STACK_SIZE          (32U * 1024U)
+/* Same as the device build: rendering CJK CFF fonts (Noto Sans CJK) needs more than 32 KB */
+#define LV_DRAW_THREAD_STACK_SIZE          (64U * 1024U)
 
 #define LV_USE_FLOAT                       1
 

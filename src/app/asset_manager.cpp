@@ -6,6 +6,7 @@
 
 #include "asset_manager.h"
 
+#include "i18n.h"
 #include "logger.h"
 
 #if LV_USE_FREETYPE
@@ -13,6 +14,7 @@
 #endif
 
 #include <algorithm>
+#include <cstdlib>
 #include <utility>
 
 #ifndef APP_NAME
@@ -48,7 +50,17 @@ std::filesystem::path weakly_canonical_path(const std::filesystem::path& path) {
     return ec ? path.lexically_normal() : canonical;
 }
 
-#if !USE_DESKTOP
+// CJK fonts tried, in order, when the language needs one (see load_cjk_font). The
+// launcher's font comes first: it is on every device (package applaunch), Noto CJK may not be.
+const char* const kCjkFonts[] = {
+    "/usr/share/APPLaunch/share/font/AlibabaPuHuiTi-3-55-Regular.ttf",
+    "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+    "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
+    "/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf",
+    "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
+    "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc",
+};
+
 const lv_font_t* fallback_font(uint32_t size) {
     if (size <= 10) {
         return &lv_font_montserrat_10;
@@ -73,7 +85,6 @@ const lv_font_t* fallback_font(uint32_t size) {
     }
     return &lv_font_montserrat_28;
 }
-#endif
 
 } // namespace
 
@@ -167,7 +178,43 @@ lv_font_t* AssetManager::load_font(const std::filesystem::path& file_name, uint3
 #endif
 }
 
+// Chinese / Japanese: the built-in Montserrat for Latin text, with a CJK FreeType font as
+// its fallback for everything Montserrat lacks. The font is a copy, so the shared built-in
+// Montserrat stays untouched. nullptr when no CJK font is installed (text then shows boxes).
+lv_font_t* AssetManager::load_cjk_font(uint32_t size) {
+    for (auto& f : cjk_fonts_) {
+        if (f.first == size) return f.second.get();
+    }
+    if (!cjk_searched_) {
+        cjk_searched_ = true;
+        std::vector<std::filesystem::path> candidates;
+        if (const char* env = std::getenv("IPDOIT_CJK_FONT"); env && env[0] == '/') {
+            candidates.emplace_back(env);
+        }
+        for (const char* p : kCjkFonts) candidates.emplace_back(p);
+        for (const auto& p : candidates) {
+            if (path_exists(p)) {
+                cjk_path_ = p;
+                break;
+            }
+        }
+        if (cjk_path_.empty()) {
+            LOG_WARN("no CJK font found; install applaunch or fonts-noto-cjk");
+        }
+    }
+    if (cjk_path_.empty()) return nullptr;
+    lv_font_t* cjk = load_font(cjk_path_, size);
+    if (!cjk) return nullptr;
+    auto copy = std::make_unique<lv_font_t>(*fallback_font(size));
+    copy->fallback = cjk;
+    cjk_fonts_.emplace_back(size, std::move(copy));
+    return cjk_fonts_.back().second.get();
+}
+
 lv_font_t* AssetManager::load_standard_font(uint32_t size, StandardFontWeight weight) {
+    if (i18n::needs_cjk()) {
+        if (auto* font = load_cjk_font(size)) return font;
+    }
 #if USE_DESKTOP
     LV_UNUSED(size);
     LV_UNUSED(weight);

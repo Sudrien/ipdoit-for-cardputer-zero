@@ -89,6 +89,22 @@ app closed. Esc skips it until Ipdoit is next started.
 Without the hook, whitelisted-only rules stay as they were until Ipdoit is next opened.
 Over SSH: `ipdoit-helper nm-hook-on` / `nm-hook-off`. Removing the package deletes the link.
 
+## Language
+
+Ipdoit is in English, Simplified Chinese and Japanese. It follows the system language
+(set with `raspi-config` > Localisation Options > Locale, then reboot): `zh*` gives
+Chinese, `ja*` Japanese, anything else English. Like gettext it reads `LANGUAGE`, `LC_ALL`,
+`LC_MESSAGES`, then `LANG`; `IPDOIT_LANG=en|zh-CN|ja` overrides them.
+
+Wording follows ufw's own Chinese and Japanese translations: ufw keywords and syntax
+(`allow`, `deny`, `limit`, `in`, `any`, `tcp`, rule text such as `ALLOW 22/tcp from any`)
+stay English, as ufw leaves them. Output from ufw and `ipdoit-helper` is always English.
+
+Chinese and Japanese text uses the launcher's font
+(`/usr/share/APPLaunch/share/font/AlibabaPuHuiTi-3-55-Regular.ttf`, package `applaunch`),
+falling back to Noto Sans CJK, Droid Sans Fallback or WenQuanYi; `IPDOIT_CJK_FONT=/path`
+picks another.
+
 ## Installed files
 
 | Path | Purpose |
