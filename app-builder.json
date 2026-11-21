@@ -29,6 +29,18 @@
       "additional_hardware": false,
       "background_service": true,
       "external_display": false
+    },
+    "locales": {
+      "zh-CN": {
+        "title": "Ipdoit",
+        "summary": "简单防火墙（UFW）配置助手",
+        "description": "简单防火墙（UFW）让你确切掌握哪些程序可以访问网络，从而提升安全性。本应用帮助你完成设置。"
+      },
+      "ja": {
+        "title": "Ipdoit",
+        "summary": "Uncomplicated Firewall（UFW）設定ヘルパー",
+        "description": "Uncomplicated Firewall（UFW）は、どのプログラムがインターネットに接続できるかを確実に把握できるようにして、セキュリティを高めます。このアプリはその設定をお手伝いします。"
+      }
     }
   }
 }
