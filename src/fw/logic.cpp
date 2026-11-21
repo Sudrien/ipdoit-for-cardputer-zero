@@ -640,11 +640,16 @@ std::string describe_rule(const Rule& r) {
 }
 
 std::string describe_template(const Template& t) {
+    return describe_template(t, "My network", "My network (whitelisted)");
+}
+
+std::string describe_template(const Template& t, const std::string& my_network,
+                              const std::string& my_network_whitelisted) {
     std::string action = t.action;
     std::transform(action.begin(), action.end(), action.begin(), ::toupper);
     std::string s = action + " " + t.port;
     if (t.proto != "any") s += "/" + t.proto;
-    s += t.scope == "any" ? " from My network" : " from My network (whitelisted)";
+    s += " from " + (t.scope == "any" ? my_network : my_network_whitelisted);
     if (!t.comment.empty()) s += "  # " + t.comment;
     return s;
 }
@@ -664,6 +669,16 @@ std::vector<Socket> ssh_sockets(const std::vector<Socket>& sockets) {
 
 std::string ssh_guard(const State& state, const Status& after_status,
                       const std::vector<Rule>& after4, const std::vector<Rule>& after6) {
+    const auto ports = ssh_blocked_ports(state, after_status, after4, after6);
+    if (ports.empty()) {
+        return "";
+    }
+    return "This blocks SSH (port " + ports + "). If you are connected over SSH, you will be "
+           "locked out.";
+}
+
+std::string ssh_blocked_ports(const State& state, const Status& after_status,
+                              const std::vector<Rule>& after4, const std::vector<Rule>& after6) {
     const auto socks = ssh_sockets(state.sockets);
     if (socks.empty()) {
         return "";
@@ -695,8 +710,7 @@ std::string ssh_guard(const State& state, const Status& after_status,
         if (!ports.empty()) ports += ", ";
         ports += std::to_string(p);
     }
-    return "This blocks SSH (port " + ports + "). If you are connected over SSH, you will be "
-           "locked out.";
+    return ports;
 }
 
 } // namespace fw

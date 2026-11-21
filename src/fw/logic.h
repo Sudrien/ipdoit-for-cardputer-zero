@@ -140,6 +140,9 @@ std::string join_args(const std::vector<std::string>& args); // for display, quo
 // Short one-line description of a rule for the Rules page.
 std::string describe_rule(const Rule& r);
 std::string describe_template(const Template& t);
+// Same, with the "My network" source names supplied (the app passes translated ones).
+std::string describe_template(const Template& t, const std::string& my_network,
+                              const std::string& my_network_whitelisted);
 
 // ---------------------------------------------------------------- SSH guard
 
@@ -148,5 +151,8 @@ std::vector<Socket> ssh_sockets(const std::vector<Socket>& sockets);
 // Warning text when `after` would block SSH that `before` lets in; "" when fine or no sshd.
 std::string ssh_guard(const State& state, const Status& after_status,
                       const std::vector<Rule>& after4, const std::vector<Rule>& after6);
+// The sshd ports ssh_guard() would warn about, as "22" or "22, 2222"; "" when fine.
+std::string ssh_blocked_ports(const State& state, const Status& after_status,
+                              const std::vector<Rule>& after4, const std::vector<Rule>& after6);
 
 } // namespace fw
