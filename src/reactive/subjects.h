@@ -6,11 +6,13 @@
 
 #pragma once
 
+#include "i18n.h"
 #include "lvgl.h"
 
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 
 namespace reactive {
 
@@ -85,8 +87,18 @@ public:
         return lv_subject_get_previous_string(native_mutable());
     }
 
+    // Text longer than the buffer is cut at a UTF-8 character boundary (a CJK character
+    // is 3 bytes), never in the middle of one.
     void set(const char* value) {
-        lv_subject_copy_string(native(), value ? value : "");
+        if (!value) value = "";
+        const std::size_t n = i18n::utf8_fit(value, Size - 1);
+        if (value[n] == '\0') {
+            lv_subject_copy_string(native(), value);
+            return;
+        }
+        std::array<char, Size> cut{};
+        std::memcpy(cut.data(), value, n);
+        lv_subject_copy_string(native(), cut.data());
     }
 
 private:

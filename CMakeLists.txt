@@ -468,6 +468,27 @@ if(IPDOIT_BUILD_TESTS)
 endif()
 
 # ====================================================
+# Translations
+# - tr() / format() over a static {en, zh-CN, ja} table, language from the environment
+# - plain C++17, no LVGL, so it can be tested on its own
+# ====================================================
+add_library(${PROJECT_NAME}_i18n
+    STATIC
+    src/i18n/i18n.cpp
+)
+
+target_include_directories(${PROJECT_NAME}_i18n
+    PUBLIC
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/i18n"
+)
+
+if(IPDOIT_BUILD_TESTS)
+    add_executable(i18n_tests tests/i18n_tests.cpp)
+    target_link_libraries(i18n_tests PRIVATE ${PROJECT_NAME}_i18n)
+    add_test(NAME i18n_tests COMMAND i18n_tests)
+endif()
+
+# ====================================================
 # Model sources
 # ====================================================
 file(GLOB_RECURSE MODEL_SOURCES CONFIGURE_DEPENDS
@@ -508,6 +529,7 @@ target_include_directories(${PROJECT_NAME}_reactive
 target_link_libraries(${PROJECT_NAME}_reactive
     PUBLIC
         lvgl
+        ${PROJECT_NAME}_i18n
 )
 
 file(GLOB_RECURSE UI_SOURCES CONFIGURE_DEPENDS
@@ -537,6 +559,7 @@ target_include_directories(${PROJECT_NAME}_view
 target_link_libraries(${PROJECT_NAME}_view
     PUBLIC
         lvgl
+        ${PROJECT_NAME}_i18n
         ${PROJECT_NAME}_reactive
         ${PROJECT_NAME}_platform
 )
@@ -564,6 +587,7 @@ target_include_directories(${PROJECT_NAME}_viewmodel
 target_link_libraries(${PROJECT_NAME}_viewmodel
     PUBLIC
         lvgl
+        ${PROJECT_NAME}_i18n
         ${PROJECT_NAME}_reactive
         ${PROJECT_NAME}_model
         ${PROJECT_NAME}_platform
@@ -636,6 +660,7 @@ target_link_libraries(${PROJECT_NAME}_core
     PUBLIC
         lvgl
         logger
+        ${PROJECT_NAME}_i18n
         ${PROJECT_NAME}_view
         ${PROJECT_NAME}_viewmodel
         ${PROJECT_NAME}_platform

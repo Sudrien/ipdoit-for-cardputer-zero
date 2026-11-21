@@ -4,6 +4,7 @@
 
 #include "ipdoit_screens.h"
 
+#include "i18n.h"
 #include "screen_style.h"
 
 #include <cstdio>
@@ -11,6 +12,7 @@
 namespace screen {
 namespace {
 
+using i18n::tr;
 using viewmodel::BaseViewModel;
 using Field = BaseViewModel::FormField;
 
@@ -193,33 +195,34 @@ void StatusScreen::refresh() {
     auto& vm = view_model();
     const auto& st = vm.state();
     if (!vm.loaded()) {
-        lv_label_set_text(state_, "Firewall ...");
+        lv_label_set_text(state_, tr("Firewall ..."));
         set_tone(state_, kToneMuted);
-        lv_label_set_text(defaults_, vm.load_error().empty() ? "Reading firewall state..."
+        lv_label_set_text(defaults_, vm.load_error().empty() ? tr("Reading firewall state...")
                                                               : vm.load_error().c_str());
         lv_label_set_text(network_, "");
         lv_label_set_text(counts_, "");
         lv_label_set_text(info_, "");
         return;
     }
-    lv_label_set_text(state_, st.status.active ? "Firewall ON" : "Firewall OFF");
+    lv_label_set_text(state_, tr(st.status.active ? "Firewall ON" : "Firewall OFF"));
     set_tone(state_, st.status.active ? kToneGood : kToneBad);
 
-    char buf[160];
-    std::snprintf(buf, sizeof(buf), "In: %s   Out: %s   Routed: %s",
-                  st.status.default_in.c_str(), st.status.default_out.c_str(),
-                  st.status.default_routed.c_str());
-    lv_label_set_text(defaults_, buf);
+    // policy values (deny, allow, ...) are ufw keywords; ufw does not translate them either
+    lv_label_set_text(defaults_, i18n::format("In: %s   Out: %s   Routed: %s",
+                                              st.status.default_in.c_str(),
+                                              st.status.default_out.c_str(),
+                                              st.status.default_routed.c_str())
+                                     .c_str());
 
     if (const auto* n = vm.current_network()) {
-        std::snprintf(buf, sizeof(buf), "%s %s  %s", n->iface.c_str(),
-                      (n->subnet4.empty() ? n->subnet6 : n->subnet4).c_str(),
-                      vm.current_network_whitelisted() ? "whitelisted" : "not whitelisted");
-        lv_label_set_text(network_, buf);
+        const std::string text =
+            n->iface + " " + (n->subnet4.empty() ? n->subnet6 : n->subnet4) + "  " +
+            tr(vm.current_network_whitelisted() ? "whitelisted" : "not whitelisted");
+        lv_label_set_text(network_, text.c_str());
         set_tone(network_, vm.current_network_whitelisted() ? kToneGood : kToneNormal);
     }
     else {
-        lv_label_set_text(network_, "No network");
+        lv_label_set_text(network_, tr("No network"));
         set_muted(network_);
     }
 
@@ -231,12 +234,14 @@ void StatusScreen::refresh() {
             ++reachable;
         }
     }
-    std::snprintf(buf, sizeof(buf), "%zu rules   %zu ports, %d open to all   %d undo",
-                  vm.rule_entries().size(), vm.port_rows().size(), reachable, st.backups);
-    lv_label_set_text(counts_, buf);
+    lv_label_set_text(counts_, i18n::format("%zu rules   %zu ports, %d open to all   %d undo",
+                                            vm.rule_entries().size(), vm.port_rows().size(),
+                                            reachable, st.backups)
+                                   .c_str());
     set_muted(counts_);
 
-    lv_label_set_text(info_, vm.busy() ? "Working..." : (vm.load_error().empty() ? "" : vm.load_error().c_str()));
+    lv_label_set_text(info_, vm.busy() ? tr("Working...")
+                                       : (vm.load_error().empty() ? "" : vm.load_error().c_str()));
     set_tone(info_, vm.load_error().empty() ? kToneMuted : kToneBad);
 }
 
@@ -271,10 +276,9 @@ void RulesScreen::build(lv_obj_t* column) {
 void RulesScreen::refresh() {
     auto& vm = view_model();
     const auto& entries = vm.rule_entries();
-    char buf[96];
-    std::snprintf(buf, sizeof(buf), "%zu rules, first match wins%s", entries.size(),
-                  vm.busy() ? "  (working...)" : "");
-    lv_label_set_text(header_, buf);
+    lv_label_set_text(header_, i18n::format("%zu rules, first match wins%s", entries.size(),
+                                            vm.busy() ? tr("  (working...)") : "")
+                                   .c_str());
     set_muted(header_);
     std::vector<std::string> rows;
     std::vector<int> tones;
@@ -283,7 +287,7 @@ void RulesScreen::refresh() {
         tones.push_back(entries[i].is_template ? 5 : kToneNormal);
     }
     if (rows.empty()) {
-        rows.push_back("No rules. Press A to add one.");
+        rows.push_back(tr("No rules. Press A to add one."));
         tones.push_back(kToneMuted);
     }
     fill_list(list_, rows, entries.empty() ? -1 : vm.rules_index(), tones);
@@ -325,16 +329,16 @@ void PortsScreen::build(lv_obj_t* column) {
 void PortsScreen::refresh() {
     auto& vm = view_model();
     const bool off = vm.loaded() && !vm.state().status.active;
-    lv_label_set_text(header_, off ? "Firewall off: everything listening is reachable"
-                                   : "ENTER: Blocked > LAN > Allowed   * other rule wins");
+    lv_label_set_text(header_, off ? tr("Firewall off: everything listening is reachable")
+                                   : tr("ENTER: Blocked > LAN > Allowed   * other rule wins"));
     set_tone(header_, off ? kToneWarn : kToneMuted);
     std::vector<std::string> rows;
     std::vector<int> tones;
     for (const auto& e : vm.port_entries()) {
-        std::string state = e.local_only ? "Local only" : fw::port_state_label(e.state);
+        std::string state = tr(e.local_only ? "Local only" : fw::port_state_label(e.state));
         if (e.overridden) state += " *";
         const std::string who = e.listening ? (e.process.empty() ? std::string("?") : e.process)
-                                            : std::string("(not listening)");
+                                            : std::string(tr("(not listening)"));
         rows.push_back(e.proto + " " + std::to_string(e.port) + "\t" + who + "\t" + state);
         int tone = kToneNormal;
         if (e.local_only || !e.listening) tone = kToneMuted;
@@ -344,7 +348,7 @@ void PortsScreen::refresh() {
         tones.push_back(tone);
     }
     if (rows.empty()) {
-        rows.push_back(vm.loaded() ? "Nothing is listening." : "Reading...");
+        rows.push_back(tr(vm.loaded() ? "Nothing is listening." : "Reading..."));
         tones.push_back(kToneMuted);
     }
     fill_list(list_, rows, vm.port_entries().empty() ? -1 : vm.ports_index(), tones, {0, 70, 196});
@@ -381,7 +385,7 @@ void NetworksScreen::build(lv_obj_t* column) {
 
 void NetworksScreen::refresh() {
     auto& vm = view_model();
-    lv_label_set_text(header_, "Current network, then whitelist");
+    lv_label_set_text(header_, tr("Current network, then whitelist"));
     set_muted(header_);
     std::vector<std::string> rows;
     std::vector<int> tones;
@@ -390,7 +394,7 @@ void NetworksScreen::refresh() {
         tones.push_back(e.whitelisted ? kToneGood : kToneNormal);
     }
     if (rows.empty()) {
-        rows.push_back("No network and nothing whitelisted.");
+        rows.push_back(tr("No network and nothing whitelisted."));
         tones.push_back(kToneMuted);
     }
     fill_list(list_, rows, vm.network_entries().empty() ? -1 : vm.networks_index(), tones);
@@ -449,7 +453,8 @@ void AddRuleScreen::refresh() {
         set_tone(footer_, kToneBad);
     }
     else {
-        lv_label_set_text(footer_, "TAB changes < >. Presets: 1 SSH 2 HTTP 3 HTTPS 4 DNS 5 mDNS");
+        lv_label_set_text(footer_,
+                          tr("TAB changes < >. Presets: 1 SSH 2 HTTP 3 HTTPS 4 DNS 5 mDNS"));
         set_muted(footer_);
     }
 }
@@ -500,7 +505,7 @@ bool AddRuleScreen::handle_key(uint32_t key) {
 // ============================================================ Free-form
 
 void FreeFormScreen::build(lv_obj_t* column) {
-    auto* hint = make_label(column, 12, false, "Type a ufw rule (allow/deny/reject/limit):");
+    auto* hint = make_label(column, 12, false, tr("Type a ufw rule (allow/deny/reject/limit):"));
     set_muted(hint);
     field_ = style::box(column);
     lv_obj_set_size(field_, LV_PCT(100), 40);
@@ -526,7 +531,7 @@ void FreeFormScreen::refresh() {
         set_tone(footer_, kToneBad);
     }
     else {
-        lv_label_set_text(footer_, "e.g. allow from 192.168.1.0/24 to any port 22 proto tcp");
+        lv_label_set_text(footer_, tr("e.g. allow from 192.168.1.0/24 to any port 22 proto tcp"));
         set_muted(footer_);
     }
 }
@@ -574,32 +579,32 @@ void ConfirmScreen::refresh() {
     }
     else {
         lv_obj_remove_flag(warning_, LV_OBJ_FLAG_HIDDEN);
-        lv_label_set_text(warning_, ("Warning: " + p.warning).c_str());
+        lv_label_set_text(warning_, i18n::format("Warning: %s", p.warning.c_str()).c_str());
         set_tone(warning_, kToneBad);
     }
     const char* phase = "";
     int tone = kToneNormal;
     switch (p.phase) {
         case viewmodel::PendingChange::Phase::Checking:
-            phase = "Checking with ufw --dry-run...";
+            phase = tr("Checking with ufw --dry-run...");
             tone = kToneMuted;
             break;
         case viewmodel::PendingChange::Phase::Ready:
             if (!p.warning.empty() && p.acknowledged) {
-                phase = "Press Enter again to apply anyway";
+                phase = tr("Press Enter again to apply anyway");
                 tone = kToneBad;
             }
             else {
-                phase = "Enter: apply    Esc: cancel";
+                phase = tr("Enter: apply    Esc: cancel");
                 tone = kToneGood;
             }
             break;
         case viewmodel::PendingChange::Phase::Applying:
-            phase = "Applying...";
+            phase = tr("Applying...");
             tone = kToneMuted;
             break;
         case viewmodel::PendingChange::Phase::Error:
-            phase = "ufw rejected this. Esc: back";
+            phase = tr("ufw rejected this. Esc: back");
             tone = kToneBad;
             break;
     }

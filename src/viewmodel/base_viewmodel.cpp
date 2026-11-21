@@ -6,6 +6,7 @@
 
 #include "base_viewmodel.h"
 
+#include "i18n.h"
 #include "parse.h"
 
 #include <algorithm>
@@ -15,6 +16,7 @@
 namespace viewmodel {
 namespace {
 
+using i18n::tr;
 using model::AppPage;
 using fw::FirewallService;
 
@@ -76,6 +78,16 @@ std::vector<fw::Rule> without_template(const std::vector<fw::Rule>& rules, int i
     return out;
 }
 
+// fw::ssh_guard() in the user's language.
+std::string ssh_warning(const fw::State& state, const fw::Status& after_status,
+                        const std::vector<fw::Rule>& after4, const std::vector<fw::Rule>& after6) {
+    const auto ports = fw::ssh_blocked_ports(state, after_status, after4, after6);
+    if (ports.empty()) return "";
+    return i18n::format(
+        "This blocks SSH (port %s). If you are connected over SSH, you will be locked out.",
+        ports.c_str());
+}
+
 const char* kActions[] = {"allow", "deny", "reject", "limit"};
 const char* kProtos[] = {"tcp", "udp", "any"};
 
@@ -100,7 +112,7 @@ BaseViewModel::BaseViewModel()
       revision_subject_(0),
       notice_subject_(""),
       password_mask_subject_(""),
-      password_message_subject_("Enter your sudo password"),
+      password_message_subject_(tr("Enter your sudo password")),
       password_busy_subject_(false) {}
 
 BaseViewModel::~BaseViewModel() {
@@ -117,9 +129,9 @@ void BaseViewModel::start() {
     privilege_.detect();
     switch (privilege_.mode()) {
         case fw::Privilege::Mode::Unavailable:
-            show_message("No root access",
-                         "Ipdoit needs sudo (or to run as root) to manage the firewall, and "
-                         "sudo was not found.",
+            show_message(tr("No root access"),
+                         tr("Ipdoit needs sudo (or to run as root) to manage the firewall, and "
+                            "sudo was not found."),
                          AppPage::Status);
             break;
         case fw::Privilege::Mode::SudoPassword:
@@ -138,12 +150,12 @@ void BaseViewModel::tick() {
         const bool ok = auth_future_.get();
         password_busy_subject_.set(false);
         if (ok) {
-            password_message_subject_.set("Enter your sudo password");
+            password_message_subject_.set(tr("Enter your sudo password"));
             show_page(AppPage::Status);
             refresh();
         }
         else {
-            password_message_subject_.set("Wrong password, try again");
+            password_message_subject_.set(tr("Wrong password, try again"));
         }
     }
 
@@ -162,7 +174,8 @@ void BaseViewModel::tick() {
     if (last.id != 0 && last.id == refresh_request_) {
         refresh_request_ = 0;
         if (!last.ok) {
-            load_error_ = last.output.empty() ? "could not read the firewall state" : last.output;
+            load_error_ =
+                last.output.empty() ? tr("could not read the firewall state") : last.output;
         }
     }
     if (last.id != 0 && last.id == pending_.request) {
@@ -200,7 +213,7 @@ void BaseViewModel::rebuild_views() {
     }
     for (const auto& t : state_.templates) {
         RuleEntry e;
-        e.text = fw::describe_template(t);
+        e.text = fw::describe_template(t, tr("My network"), tr("My network (whitelisted)"));
         e.is_template = true;
         e.template_id = t.id;
         rule_entries_.push_back(std::move(e));
@@ -216,8 +229,8 @@ void BaseViewModel::rebuild_views() {
         e.key = n.key();
         e.subnet4 = n.subnet4;
         e.whitelisted = fw::is_whitelisted(n, state_.whitelist);
-        e.text = n.iface + "  " + (n.subnet4.empty() ? n.subnet6 : n.subnet4) +
-                 (e.whitelisted ? "  whitelisted" : "  not whitelisted");
+        e.text = n.iface + "  " + (n.subnet4.empty() ? n.subnet6 : n.subnet4) + "  " +
+                 tr(e.whitelisted ? "whitelisted" : "not whitelisted");
         network_entries_.push_back(std::move(e));
     }
     for (const auto& w : state_.whitelist) {
@@ -294,7 +307,7 @@ void BaseViewModel::update_title(AppPage page) {
     static const char* const kNames[] = {"Status", "Rules", "Ports", "Networks"};
     std::string title = model_.app_title();
     for (int i = 0; i < model::kMainPageCount; ++i) {
-        if (model::kMainPages[i] == page) title += std::string("  ") + kNames[i];
+        if (model::kMainPages[i] == page) title += std::string("  ") + tr(kNames[i]);
     }
     title_subject_.set(title.c_str());
 }
@@ -396,7 +409,7 @@ void BaseViewModel::password_backspace() {
 void BaseViewModel::password_submit() {
     if (password_busy_subject_.value() || password_input_.empty()) return;
     password_busy_subject_.set(true);
-    password_message_subject_.set("Checking...");
+    password_message_subject_.set(tr("Checking..."));
     std::string attempt = password_input_;
     wipe(password_input_);
     publish_password_mask();
@@ -429,11 +442,11 @@ void BaseViewModel::move_selection(int delta) {
 
 void BaseViewModel::open_confirm(PendingChange change) {
     if (service_->busy()) {
-        notice("Busy - try again in a moment");
+        notice(tr("Busy - try again in a moment"));
         return;
     }
     if (!loaded_) {
-        notice("Firewall state not loaded yet");
+        notice(tr("Firewall state not loaded yet"));
         return;
     }
     pending_ = std::move(change);
@@ -452,21 +465,21 @@ void BaseViewModel::toggle_enable() {
     PendingChange c;
     c.return_page = AppPage::Status;
     if (state_.status.active) {
-        c.title = "Turn firewall off";
+        c.title = tr("Turn firewall off");
         c.command = "ufw disable";
         c.helper_args = {"disable"};
-        c.note = "All ports become reachable. Rules are kept.";
+        c.note = tr("All ports become reachable. Rules are kept.");
     }
     else {
-        c.title = "Turn firewall on";
+        c.title = tr("Turn firewall on");
         c.command = "ufw --force enable";
         c.helper_args = {"enable"};
         fw::Status after = state_.status;
         after.active = true;
-        c.note = "Incoming default: " + state_.status.default_in + ".";
+        c.note = i18n::format("Incoming default: %s.", state_.status.default_in.c_str());
         // The helper adds "limit <port>/tcp" for sshd when nothing allows it (SSH exception).
-        if (!fw::ssh_guard(state_, after, state_.rules4, state_.rules6).empty()) {
-            c.note += " SSH will be allowed (rate-limited) so you are not locked out.";
+        if (!ssh_warning(state_, after, state_.rules4, state_.rules6).empty()) {
+            c.note += tr(" SSH will be allowed (rate-limited) so you are not locked out.");
         }
     }
     open_confirm(std::move(c));
@@ -475,24 +488,24 @@ void BaseViewModel::toggle_enable() {
 void BaseViewModel::toggle_whitelist() {
     const auto* n = current_network();
     if (!n) {
-        notice("Not connected to a network");
+        notice(tr("Not connected to a network"));
         return;
     }
     if (n->subnet4.empty()) {
-        notice("This network has no IPv4 subnet to whitelist");
+        notice(tr("This network has no IPv4 subnet to whitelist"));
         return;
     }
     PendingChange c;
     c.return_page = AppPage::Status;
     const std::string where = n->iface + " " + n->subnet4 +
-                              (n->gateway.empty() ? std::string(" (no gateway)")
+                              (n->gateway.empty() ? std::string(tr(" (no gateway)"))
                                                   : " via " + n->gateway +
                                                         (n->gw_mac.empty() ? "" : " " + n->gw_mac));
     if (fw::is_whitelisted(*n, state_.whitelist)) {
-        c.title = "Remove network from whitelist";
+        c.title = tr("Remove network from whitelist");
         c.command = where;
         c.helper_args = {"whitelist-remove", n->key(), n->subnet4};
-        c.note = "\"Whitelisted only\" My network rules stop applying here.";
+        c.note = tr("\"Whitelisted only\" My network rules stop applying here.");
         // rules from whitelisted-only templates for this network go away
         auto after4 = state_.rules4;
         auto after6 = state_.rules6;
@@ -501,14 +514,14 @@ void BaseViewModel::toggle_whitelist() {
             after4 = without_template(after4, t.id);
             after6 = without_template(after6, t.id);
         }
-        c.warning = fw::ssh_guard(state_, state_.status, after4, after6);
+        c.warning = ssh_warning(state_, state_.status, after4, after6);
     }
     else {
-        c.title = "Whitelist this network";
+        c.title = tr("Whitelist this network");
         c.command = where;
         c.helper_args = {"whitelist-add", n->key(), n->subnet4, n->iface + " " + n->subnet4};
-        c.note = "\"Whitelisted only\" My network rules will apply here. A gateway MAC can be "
-                 "copied, so this is a convenience, not strong security.";
+        c.note = tr("\"Whitelisted only\" My network rules will apply here. A gateway MAC can be "
+                    "copied, so this is a convenience, not strong security.");
         for (const auto& t : state_.templates) {
             if (t.scope == "whitelisted") c.offer_nm_hook = true;
         }
@@ -518,16 +531,17 @@ void BaseViewModel::toggle_whitelist() {
 
 void BaseViewModel::undo() {
     if (state_.backups <= 0) {
-        notice("Nothing to undo");
+        notice(tr("Nothing to undo"));
         return;
     }
     PendingChange c;
     c.return_page = AppPage::Status;
-    c.title = "Undo last change";
-    c.command = "restore rules from before the last change";
+    c.title = tr("Undo last change");
+    c.command = tr("restore rules from before the last change");
     c.helper_args = {"undo"};
-    c.note = "Cannot be previewed. Does not turn the firewall on or off. " +
-             std::to_string(state_.backups) + " change(s) can be undone.";
+    c.note = i18n::format(
+        "Cannot be previewed. Does not turn the firewall on or off. %d change(s) can be undone.",
+        state_.backups);
     open_confirm(std::move(c));
 }
 
@@ -536,20 +550,20 @@ void BaseViewModel::delete_selected_rule() {
     const auto& e = rule_entries_[rules_index_];
     PendingChange c;
     c.return_page = AppPage::Rules;
-    c.title = "Delete rule";
+    c.title = tr("Delete rule");
     c.command = e.text;
     if (e.is_template) {
         c.helper_args = {"mynet-delete", std::to_string(e.template_id)};
-        c.note = "Removes this My network rule on every network.";
-        c.warning = fw::ssh_guard(state_, state_.status,
-                                  without_template(state_.rules4, e.template_id),
-                                  without_template(state_.rules6, e.template_id));
+        c.note = tr("Removes this My network rule on every network.");
+        c.warning = ssh_warning(state_, state_.status,
+                                without_template(state_.rules4, e.template_id),
+                                without_template(state_.rules6, e.template_id));
     }
     else {
         c.helper_args = {"delete", e.v6 ? "6" : "4", e.raw};
-        c.warning = fw::ssh_guard(state_, state_.status,
-                                  e.v6 ? state_.rules4 : without_raw(state_.rules4, e.raw),
-                                  e.v6 ? without_raw(state_.rules6, e.raw) : state_.rules6);
+        c.warning = ssh_warning(state_, state_.status,
+                                e.v6 ? state_.rules4 : without_raw(state_.rules4, e.raw),
+                                e.v6 ? without_raw(state_.rules6, e.raw) : state_.rules6);
     }
     open_confirm(std::move(c));
 }
@@ -564,7 +578,7 @@ void BaseViewModel::remove_selected_network() {
     }
     PendingChange c;
     c.return_page = AppPage::Networks;
-    c.title = "Remove network from whitelist";
+    c.title = tr("Remove network from whitelist");
     c.command = e.text;
     c.helper_args = {"whitelist-remove", e.key, e.subnet4};
     open_confirm(std::move(c));
@@ -574,11 +588,11 @@ void BaseViewModel::toggle_selected_port() {
     if (ports_index_ < 0 || ports_index_ >= static_cast<int>(port_entries_.size())) return;
     const auto& e = port_entries_[ports_index_];
     if (e.local_only) {
-        notice("Only listens on this device; the firewall does not apply");
+        notice(tr("Only listens on this device; the firewall does not apply"));
         return;
     }
     if (service_->busy()) {
-        notice("Busy - try again in a moment");
+        notice(tr("Busy - try again in a moment"));
         return;
     }
     const auto target = fw::next_port_state(e.state);
@@ -587,15 +601,17 @@ void BaseViewModel::toggle_selected_port() {
                                                         : "allowed";
     PendingChange c;
     c.return_page = AppPage::Ports;
-    c.title = e.proto + " " + std::to_string(e.port) + ": " + fw::port_state_label(target);
-    c.command = "port " + std::to_string(e.port) + "/" + e.proto + " -> " + fw::port_state_label(target);
+    const std::string label = tr(fw::port_state_label(target));
+    c.title = e.proto + " " + std::to_string(e.port) + ": " + label;
+    c.command = "port " + std::to_string(e.port) + "/" + e.proto + " -> " + label;
     c.helper_args = {"port-set", std::to_string(e.port), e.proto, word};
     std::vector<fw::Rule> after4, after6;
     fw::simulate_port_set(state_, e.proto, e.port, target, after4, after6);
-    c.warning = fw::ssh_guard(state_, state_.status, after4, after6);
+    c.warning = ssh_warning(state_, state_.status, after4, after6);
     if (!c.warning.empty()) {
         if (target == fw::PortState::Lan && !current_network_whitelisted()) {
-            c.note = "LAN means My network (whitelisted only), and this network is not whitelisted.";
+            c.note = tr("LAN means My network (whitelisted only), and this network is not "
+                        "whitelisted.");
         }
         open_confirm(std::move(c)); // only lockouts need confirming
         return;
@@ -611,13 +627,13 @@ void BaseViewModel::toggle_selected_port() {
 
 const char* BaseViewModel::form_field_label(int field) {
     switch (static_cast<FormField>(field)) {
-        case FormField::Action: return "Action";
-        case FormField::Direction: return "Direction";
-        case FormField::Port: return "Port";
-        case FormField::Proto: return "Protocol";
-        case FormField::Source: return "From";
-        case FormField::CustomSource: return "Address";
-        case FormField::Comment: return "Comment";
+        case FormField::Action: return tr("Action");
+        case FormField::Direction: return tr("Direction");
+        case FormField::Port: return tr("Port");
+        case FormField::Proto: return tr("Protocol");
+        case FormField::Source: return tr("From");
+        case FormField::CustomSource: return tr("Address");
+        case FormField::Comment: return tr("Comment");
         default: return "";
     }
 }
@@ -631,9 +647,9 @@ std::string BaseViewModel::form_field_value(int field) const {
         case FormField::Source:
             switch (form_.source) {
                 case fw::RuleForm::Source::Any: return "any";
-                case fw::RuleForm::Source::MyNetWhitelisted: return "My network (whitelisted)";
-                case fw::RuleForm::Source::MyNetAny: return "My network (any network)";
-                case fw::RuleForm::Source::Custom: return "address...";
+                case fw::RuleForm::Source::MyNetWhitelisted: return tr("My network (whitelisted)");
+                case fw::RuleForm::Source::MyNetAny: return tr("My network (any network)");
+                case fw::RuleForm::Source::Custom: return tr("address...");
             }
             return "";
         case FormField::CustomSource: return form_.custom_source;
@@ -747,17 +763,17 @@ void BaseViewModel::form_apply_preset(int index) {
 }
 
 void BaseViewModel::form_submit() {
-    form_error_ = fw::validate_form(form_);
+    form_error_ = tr(fw::validate_form(form_));
     if (!form_error_.empty()) {
         bump();
         return;
     }
     PendingChange c;
     c.return_page = AppPage::Rules;
-    c.title = "Add rule";
+    c.title = tr("Add rule");
     if (form_.is_mynet()) {
         auto t = fw::form_template(form_);
-        c.command = fw::describe_template(t);
+        c.command = fw::describe_template(t, tr("My network"), tr("My network (whitelisted)"));
         c.helper_args = {"mynet-add", t.action, t.proto, t.port, t.scope};
         c.offer_nm_hook = t.scope == "whitelisted";
         if (!t.comment.empty()) c.helper_args.push_back(t.comment);
@@ -781,11 +797,13 @@ void BaseViewModel::form_submit() {
                 (r.v6 ? after6 : after4).push_back(r);
             }
         }
-        c.warning = fw::ssh_guard(state_, state_.status, after4, after6);
+        c.warning = ssh_warning(state_, state_.status, after4, after6);
         const auto* n = current_network();
         const bool applies_now = n && (t.scope == "any" || fw::is_whitelisted(*n, state_.whitelist));
-        c.note = applies_now ? "Applies now, from " + (n->subnet4.empty() ? n->subnet6 : n->subnet4) + "."
-                             : "Not active on this network (it is not whitelisted).";
+        c.note = applies_now
+                     ? i18n::format("Applies now, from %s.",
+                                    (n->subnet4.empty() ? n->subnet6 : n->subnet4).c_str())
+                     : tr("Not active on this network (it is not whitelisted).");
     }
     else {
         const auto args = fw::form_args(form_);
@@ -820,14 +838,14 @@ void BaseViewModel::freeform_backspace() {
 
 void BaseViewModel::freeform_submit() {
     std::vector<std::string> args;
-    freeform_error_ = fw::validate_freeform(freeform_text_, args);
+    freeform_error_ = tr(fw::validate_freeform(freeform_text_, args));
     if (!freeform_error_.empty()) {
         bump();
         return;
     }
     PendingChange c;
     c.return_page = AppPage::Rules;
-    c.title = "Add rule";
+    c.title = tr("Add rule");
     c.command = "ufw " + fw::join_args(args);
     c.dry_run_args = args;
     c.helper_args = {"add"};
@@ -848,12 +866,12 @@ void BaseViewModel::finish_dry_run(const FirewallService::Result& result) {
     // a family missing from the dry-run output is unchanged
     if (result.output.find(":ufw-user-input") == std::string::npos) after4 = state_.rules4;
     if (result.output.find(":ufw6-user-input") == std::string::npos) after6 = state_.rules6;
-    pending_.warning = fw::ssh_guard(state_, state_.status, after4, after6);
+    pending_.warning = ssh_warning(state_, state_.status, after4, after6);
     if (result.output.find("Skipping") != std::string::npos) {
-        pending_.note = "This rule already exists; applying changes nothing.";
+        pending_.note = tr("This rule already exists; applying changes nothing.");
     }
     else {
-        pending_.note = "Checked with ufw --dry-run.";
+        pending_.note = tr("Checked with ufw --dry-run.");
     }
     pending_.phase = PendingChange::Phase::Ready;
 }
@@ -867,7 +885,7 @@ void BaseViewModel::confirm_accept() {
     }
     const auto id = service_->apply(pending_.helper_args);
     if (!id) {
-        notice("Busy - try again in a moment");
+        notice(tr("Busy - try again in a moment"));
         return;
     }
     pending_.request = id;
@@ -878,7 +896,8 @@ void BaseViewModel::confirm_accept() {
 void BaseViewModel::finish_apply(const FirewallService::Result& result) {
     const auto back_to = pending_.return_page;
     if (result.ok) {
-        notice(pending_.title + (back_to == AppPage::Ports ? "  (U undo)" : ": done"));
+        notice(back_to == AppPage::Ports ? i18n::format("%s  (U undo)", pending_.title.c_str())
+                                          : i18n::format("%s: done", pending_.title.c_str()));
         const bool offer = pending_.offer_nm_hook;
         pending_ = PendingChange{};
         if (offer && should_offer_nm_hook()) {
@@ -888,9 +907,10 @@ void BaseViewModel::finish_apply(const FirewallService::Result& result) {
         show_page(back_to);
     }
     else {
-        const auto title = pending_.title + " failed";
+        const auto title = i18n::format("%s failed", pending_.title.c_str());
         pending_ = PendingChange{};
-        show_message(title, result.output.empty() ? "ipdoit-helper failed" : result.output,
+        show_message(title,
+                     result.output.empty() ? std::string(tr("ipdoit-helper failed")) : result.output,
                      back_to);
     }
 }
@@ -905,12 +925,12 @@ void BaseViewModel::offer_nm_hook(AppPage return_page) {
     PendingChange c;
     c.return_page = return_page;
     c.is_nm_hook_offer = true;
-    c.title = "Follow network changes?";
-    c.command = "link nm-dispatcher into\n/etc/NetworkManager/dispatcher.d";
+    c.title = tr("Follow network changes?");
+    c.command = tr("link nm-dispatcher into\n/etc/NetworkManager/dispatcher.d");
     c.helper_args = {"nm-hook-on"};
-    c.note = "\"Whitelisted only\" rules are only updated while Ipdoit is open. If you leave "
-             "this network, they stay open until you open Ipdoit again. Enter lets "
-             "NetworkManager re-sync them on every network change. Esc: not now.";
+    c.note = tr("\"Whitelisted only\" rules are only updated while Ipdoit is open. If you leave "
+                "this network, they stay open until you open Ipdoit again. Enter lets "
+                "NetworkManager re-sync them on every network change. Esc: not now.");
     open_confirm(std::move(c));
 }
 

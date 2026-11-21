@@ -205,14 +205,14 @@ private:
     std::string password_input_;
     std::future<bool> auth_future_;
 
-    reactive::StringSubject<32> title_subject_;
+    reactive::StringSubject<48> title_subject_;
     reactive::BoolSubject dark_mode_subject_;
     reactive::IntSubject current_page_subject_;
     reactive::BoolSubject quit_requested_subject_;
     reactive::IntSubject revision_subject_;
-    reactive::StringSubject<96> notice_subject_;
+    reactive::StringSubject<192> notice_subject_;
     reactive::StringSubject<64> password_mask_subject_;
-    reactive::StringSubject<64> password_message_subject_;
+    reactive::StringSubject<96> password_message_subject_;
     reactive::BoolSubject password_busy_subject_;
 };
 
