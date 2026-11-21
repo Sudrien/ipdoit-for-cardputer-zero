@@ -19,7 +19,7 @@
     "icon": "assets/images/ipdoit-store-icon.png",
     "license": "MIT",
     "source_repo": "https://github.com/Sudrien/ipdoit-for-cardputer-zero",
-    "author": { "github": "Sudrien", "display_name": "TODO: Your Name" },
+    "author": { "github": "Sudrien", "display_name": "Sudrien" },
     "share_code": "IPDO",
     "permissions": {
       "camera": false,
